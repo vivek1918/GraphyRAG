@@ -1,0 +1,156 @@
+# Knowledge Graph Analytics Queries
+# These queries provide analytical insights about the knowledge graph
+
+# Count entities by type
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?type (COUNT(?entity) as ?count)
+WHERE {
+  ?entity a ?type .
+  FILTER(STRSTARTS(STR(?type), "http://kg.example.org/ontology/"))
+}
+GROUP BY ?type
+ORDER BY DESC(?count)
+
+# Most connected entities (degree centrality)
+PREFIX : <http://kg.example.org/ontology/>
+
+SELECT ?entity ?label (COUNT(?relation) as ?degree)
+WHERE {
+  {
+    ?entity ?relation ?object .
+    FILTER(STRSTARTS(STR(?relation), "http://kg.example.org/ontology/"))
+  } UNION {
+    ?subject ?relation ?entity .
+    FILTER(STRSTARTS(STR(?relation), "http://kg.example.org/ontology/"))
+  }
+  OPTIONAL { ?entity rdfs:label ?label . }
+}
+GROUP BY ?entity ?label
+ORDER BY DESC(?degree)
+LIMIT 20
+
+# Relation type distribution
+PREFIX : <http://kg.example.org/ontology/>
+
+SELECT ?relationType (COUNT(*) as ?count)
+WHERE {
+  ?subject ?relationType ?object .
+  FILTER(STRSTARTS(STR(?relationType), "http://kg.example.org/ontology/"))
+}
+GROUP BY ?relationType
+ORDER BY DESC(?count)
+
+# Document source statistics
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?sourceType (COUNT(?doc) as ?docCount) (COUNT(DISTINCT ?entity) as ?entityCount)
+WHERE {
+  ?doc a :Document ;
+       :sourceType ?sourceType .
+  OPTIONAL {
+    ?entity :extractedFrom ?doc .
+  }
+}
+GROUP BY ?sourceType
+ORDER BY DESC(?docCount)
+
+# Temporal distribution of documents
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+SELECT ?date (COUNT(?doc) as ?docCount)
+WHERE {
+  ?doc a :Document ;
+       :createdAt ?dateStr .
+  BIND(xsd:dateTime(?dateStr) as ?date)
+  BIND(SUBSTR(STR(?dateStr), 1, 10) as ?dateDay)
+}
+GROUP BY ?dateDay
+ORDER BY ?dateDay
+
+# Entity co-occurrence in documents
+PREFIX : <http://kg.example.org/ontology/>
+
+SELECT ?entity1 ?entity2 (COUNT(?doc) as ?coOccurrenceCount)
+WHERE {
+  ?doc a :Document .
+  ?entity1 :extractedFrom ?doc .
+  ?entity2 :extractedFrom ?doc .
+  FILTER(STR(?entity1) < STR(?entity2))
+}
+GROUP BY ?entity1 ?entity2
+HAVING (?coOccurrenceCount > 1)
+ORDER BY DESC(?coOccurrenceCount)
+LIMIT 20
+
+# Most frequent entity mentions
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?entity ?label (COUNT(?doc) as ?mentionCount)
+WHERE {
+  ?entity :extractedFrom ?doc .
+  OPTIONAL { ?entity rdfs:label ?label . }
+}
+GROUP BY ?entity ?label
+ORDER BY DESC(?mentionCount)
+LIMIT 25
+
+# Relation confidence distribution
+PREFIX : <http://kg.example.org/ontology/>
+
+SELECT ?confidenceRange (COUNT(*) as ?relationCount)
+WHERE {
+  ?relationInstance a :Relation ;
+                    :confidence ?confidence .
+  BIND(
+    IF(?confidence < 0.3, "0.0-0.3",
+      IF(?confidence < 0.6, "0.3-0.6",
+        IF(?confidence < 0.8, "0.6-0.8", "0.8-1.0")))
+    AS ?confidenceRange)
+}
+GROUP BY ?confidenceRange
+ORDER BY ?confidenceRange
+
+# Cross-domain entity connections
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?type1 ?type2 (COUNT(*) as ?connectionCount)
+WHERE {
+  ?entity1 a ?type1 ;
+            ?relation ?entity2 .
+  ?entity2 a ?type2 .
+  FILTER(STRSTARTS(STR(?type1), "http://kg.example.org/ontology/"))
+  FILTER(STRSTARTS(STR(?type2), "http://kg.example.org/ontology/"))
+  FILTER(STRSTARTS(STR(?relation), "http://kg.example.org/ontology/"))
+  FILTER(STR(?type1) < STR(?type2))
+}
+GROUP BY ?type1 ?type2
+ORDER BY DESC(?connectionCount)
+
+# Extraction pipeline performance by source type
+PREFIX : <http://kg.example.org/ontology/>
+
+SELECT ?sourceType 
+       (COUNT(?doc) as ?totalDocs)
+       (COUNT(?entity) as ?totalEntities)
+       (COUNT(?entity)/COUNT(?doc) as ?entitiesPerDoc)
+       (COUNT(DISTINCT ?relation) as ?totalRelations)
+WHERE {
+  ?doc a :Document ;
+       :sourceType ?sourceType .
+  OPTIONAL {
+    ?entity :extractedFrom ?doc .
+  }
+  OPTIONAL {
+    ?relationInstance a :Relation ;
+                     :extractedFrom ?doc .
+  }
+}
+GROUP BY ?sourceType
+ORDER BY DESC(?totalDocs)

@@ -1,0 +1,219 @@
+# Knowledge Graph Example Queries
+# These are example queries for common use cases
+
+# Basic entity lookup
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?entity ?label ?type
+WHERE {
+  ?entity a ?type ;
+          rdfs:label ?label .
+  FILTER(STRSTARTS(STR(?type), "http://kg.example.org/ontology/"))
+}
+LIMIT 10
+
+# Find all persons
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?person ?name
+WHERE {
+  ?person a :Person ;
+          rdfs:label ?name .
+}
+LIMIT 15
+
+# Find people who work for specific organizations
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?person ?personName ?org ?orgName
+WHERE {
+  ?person a :Person ;
+          rdfs:label ?personName ;
+          :worksFor ?org .
+  ?org a :Organization ;
+       rdfs:label ?orgName .
+}
+LIMIT 20
+
+# Find organizations and their locations
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?org ?orgName ?location ?locationName
+WHERE {
+  ?org a :Organization ;
+       rdfs:label ?orgName ;
+       :locatedIn ?location .
+  ?location a :Place ;
+            rdfs:label ?locationName .
+}
+LIMIT 15
+
+# Find events with participants and locations
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?event ?eventName ?person ?personName ?location ?locationName
+WHERE {
+  ?event a :Event ;
+         rdfs:label ?eventName .
+  OPTIONAL {
+    ?person a :Person ;
+            rdfs:label ?personName ;
+            :participatedIn ?event .
+  }
+  OPTIONAL {
+    ?event :locatedIn ?location .
+    ?location a :Place ;
+              rdfs:label ?locationName .
+  }
+}
+LIMIT 15
+
+# Find documents that mention specific entities
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?doc ?entity ?entityName ?entityType
+WHERE {
+  ?doc a :Document .
+  ?entity :extractedFrom ?doc ;
+          rdfs:label ?entityName ;
+          a ?entityType .
+  FILTER(STRSTARTS(STR(?entityType), "http://kg.example.org/ontology/"))
+}
+LIMIT 20
+
+# Find relations between entities with confidence
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?subject ?subjectName ?predicate ?object ?objectName ?confidence
+WHERE {
+  ?subject ?predicate ?object .
+  ?subject rdfs:label ?subjectName .
+  ?object rdfs:label ?objectName .
+  FILTER(STRSTARTS(STR(?predicate), "http://kg.example.org/ontology/"))
+  OPTIONAL {
+    [] a :Relation ;
+       :relationWith ?object ;
+       :hasRelation ?subject ;
+       :confidence ?confidence .
+  }
+}
+LIMIT 20
+
+# Find entity aliases
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?entity ?canonicalName ?alias
+WHERE {
+  ?entity rdfs:label ?canonicalName ;
+          :hasAlias ?alias .
+}
+LIMIT 15
+
+# Find sameAs relations between entities
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+
+SELECT ?entity1 ?name1 ?entity2 ?name2
+WHERE {
+  ?entity1 owl:sameAs ?entity2 .
+  ?entity1 rdfs:label ?name1 .
+  ?entity2 rdfs:label ?name2 .
+  FILTER(STR(?entity1) < STR(?entity2))
+}
+LIMIT 15
+
+# Find entities by role
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?person ?personName ?role
+WHERE {
+  ?person a :Person ;
+          rdfs:label ?personName ;
+          :hasRole ?role .
+}
+LIMIT 15
+
+# Document provenance trail
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+
+SELECT ?doc ?entity ?entityName ?extractionMethod
+WHERE {
+  ?doc a :Document .
+  ?entity :extractedFrom ?doc ;
+          rdfs:label ?entityName ;
+          :extractionMethod ?extractionMethod .
+}
+LIMIT 20
+
+# Multi-hop connections: People connected through organizations
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?person1 ?name1 ?org ?orgName ?person2 ?name2
+WHERE {
+  ?person1 a :Person ;
+           rdfs:label ?name1 ;
+           :worksFor ?org .
+  ?person2 a :Person ;
+           rdfs:label ?name2 ;
+           :worksFor ?org .
+  ?org a :Organization ;
+       rdfs:label ?orgName .
+  FILTER(STR(?person1) < STR(?person2))
+}
+LIMIT 15
+
+# Temporal queries: Recent documents and their entities
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?doc ?createdAt ?entity ?entityName ?entityType
+WHERE {
+  ?doc a :Document ;
+       :createdAt ?createdAt .
+  ?entity :extractedFrom ?doc ;
+          rdfs:label ?entityName ;
+          a ?entityType .
+  FILTER(STRSTARTS(STR(?entityType), "http://kg.example.org/ontology/"))
+  FILTER(xsd:dateTime(?createdAt) > xsd:dateTime("2024-01-01T00:00:00Z"))
+}
+ORDER BY DESC(?createdAt)
+LIMIT 20
+
+# Complex pattern: People in the same location working for different organizations
+PREFIX : <http://kg.example.org/ontology/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?person1 ?name1 ?org1 ?orgName1 ?person2 ?name2 ?org2 ?orgName2 ?location ?locationName
+WHERE {
+  ?person1 a :Person ;
+           rdfs:label ?name1 ;
+           :worksFor ?org1 ;
+           :locatedIn ?location .
+  ?person2 a :Person ;
+           rdfs:label ?name2 ;
+           :worksFor ?org2 ;
+           :locatedIn ?location .
+  ?org1 a :Organization ;
+        rdfs:label ?orgName1 .
+  ?org2 a :Organization ;
+        rdfs:label ?orgName2 .
+  ?location a :Place ;
+            rdfs:label ?locationName .
+  FILTER(STR(?person1) < STR(?person2))
+  FILTER(STR(?org1) != STR(?org2))
+}
+LIMIT 15

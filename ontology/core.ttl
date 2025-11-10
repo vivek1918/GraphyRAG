@@ -1,0 +1,151 @@
+@prefix : <http://kg.example.org/ontology/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix schema: <http://schema.org/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix time: <http://www.w3.org/2006/time#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+
+: a owl:Ontology ;
+  rdfs:label "Core Knowledge Graph Ontology" ;
+  rdfs:comment "A domain-agnostic ontology for semantic knowledge graphs" ;
+  owl:versionInfo "1.0" .
+
+### Classes ###
+:Entity a owl:Class ;
+  rdfs:label "Entity" ;
+  rdfs:comment "Top-level class for all entities" .
+
+:Person a owl:Class ;
+  rdfs:label "Person" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:subClassOf [
+    a owl:Restriction ;
+    owl:onProperty schema:name ;
+    owl:minCardinality 1
+  ] .
+
+:Organization a owl:Class ;
+  rdfs:label "Organization" ;
+  rdfs:subClassOf :Entity .
+
+:Place a owl:Class ;
+  rdfs:label "Place" ;
+  rdfs:subClassOf :Entity .
+
+:Event a owl:Class ;
+  rdfs:label "Event" ;
+  rdfs:subClassOf :Entity .
+
+:Concept a owl:Class ;
+  rdfs:label "Concept" ;
+  rdfs:subClassOf :Entity .
+
+:Document a owl:Class ;
+  rdfs:label "Document" ;
+  rdfs:subClassOf :Entity .
+
+:Media a owl:Class ;
+  rdfs:label "Media" ;
+  rdfs:subClassOf :Entity .
+
+:Relation a owl:Class ;
+  rdfs:label "Relation" ;
+  rdfs:comment "A relationship between entities" .
+
+### Properties ###
+:mentions a owl:ObjectProperty ;
+  rdfs:label "mentions" ;
+  rdfs:domain :Document ;
+  rdfs:range :Entity ;
+  rdfs:comment "Document mentions an entity" .
+
+:hasText a owl:DatatypeProperty ;
+  rdfs:label "has text" ;
+  rdfs:domain :Document ;
+  rdfs:range xsd:string .
+
+:occurredAt a owl:ObjectProperty ;
+  rdfs:label "occurred at" ;
+  rdfs:domain :Event ;
+  rdfs:range time:Instant ;
+  rdfs:comment "When an event occurred" .
+
+:createdAt a owl:DatatypeProperty ;
+  rdfs:label "created at" ;
+  rdfs:domain :Document ;
+  rdfs:range xsd:dateTime .
+
+:sourceType a owl:DatatypeProperty ;
+  rdfs:label "source type" ;
+  rdfs:domain :Document ;
+  rdfs:range xsd:string .
+
+:confidence a owl:DatatypeProperty ;
+  rdfs:label "confidence" ;
+  rdfs:domain :Relation ;
+  rdfs:range xsd:float .
+
+:hasRelation a owl:ObjectProperty ;
+  rdfs:label "has relation" ;
+  rdfs:domain :Entity ;
+  rdfs:range :Relation .
+
+:relationWith a owl:ObjectProperty ;
+  rdfs:label "relation with" ;
+  rdfs:domain :Relation ;
+  rdfs:range :Entity .
+
+:sameAs a owl:ObjectProperty ;
+  rdfs:label "same as" ;
+  rdfs:domain :Entity ;
+  rdfs:range :Entity ;
+  owl:equivalentProperty owl:sameAs .
+
+:hasAlias a owl:DatatypeProperty ;
+  rdfs:label "has alias" ;
+  rdfs:domain :Entity ;
+  rdfs:range xsd:string .
+
+:hasCategory a owl:DatatypeProperty ;
+  rdfs:label "has category" ;
+  rdfs:domain :Entity ;
+  rdfs:range xsd:string .
+
+### Common Relations ###
+:worksFor a owl:ObjectProperty ;
+  rdfs:label "works for" ;
+  rdfs:domain :Person ;
+  rdfs:range :Organization ;
+  rdfs:subPropertyOf :hasRelation .
+
+:locatedIn a owl:ObjectProperty ;
+  rdfs:label "located in" ;
+  rdfs:domain :Entity ;
+  rdfs:range :Place ;
+  rdfs:subPropertyOf :hasRelation .
+
+:participatedIn a owl:ObjectProperty ;
+  rdfs:label "participated in" ;
+  rdfs:domain :Person ;
+  rdfs:range :Event ;
+  rdfs:subPropertyOf :hasRelation .
+
+:hasRole a owl:DatatypeProperty ;
+  rdfs:label "has role" ;
+  rdfs:domain :Person ;
+  rdfs:range xsd:string .
+
+### Provenance ###
+:extractedFrom a owl:ObjectProperty ;
+  rdfs:label "extracted from" ;
+  rdfs:domain :Entity ;
+  rdfs:range :Document ;
+  rdfs:subPropertyOf prov:wasDerivedFrom .
+
+:extractionMethod a owl:DatatypeProperty ;
+  rdfs:label "extraction method" ;
+  rdfs:domain :Entity ;
+  rdfs:range xsd:string .

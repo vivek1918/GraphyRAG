@@ -1,0 +1,61 @@
+# System Configuration
+system:
+  mode: "local"  # local, groq, hf
+  data_dir: "./data"
+  log_level: "INFO"
+
+# Model Configuration
+models:
+  embeddings:
+    local: "sentence-transformers/all-MiniLM-L6-v2"
+    hf: "sentence-transformers/all-MiniLM-L6-v2"
+  
+  ner:
+    local: "dslim/bert-base-NER"
+    hf: "dslim/bert-base-NER"
+  
+  relation:
+    local: "microsoft/DialoGPT-medium"
+    hf: "microsoft/DialoGPT-medium"
+  
+  llm:
+    groq: "llama3.1-8b-8192"
+    local: "llama-7b-q4.gguf"
+
+# Processing Configuration
+processing:
+  batch_size: 32
+  max_text_length: 4096
+  chunk_size: 512
+  chunk_overlap: 50
+
+# Extraction Configuration
+extraction:
+  min_confidence: 0.7
+  max_entities_per_doc: 100
+  coref_resolution: true
+  entity_linking: true
+
+# Knowledge Graph Configuration
+kg:
+  fuseki_url: "http://localhost:3030"
+  dataset: "kg"
+  neo4j_url: "bolt://localhost:7687"
+  neo4j_user: "neo4j"
+  neo4j_password: "password"
+
+# RAG Configuration
+rag:
+  vector_store: "faiss"  # faiss, chroma
+  top_k: 5
+  similarity_threshold: 0.7
+
+# API Configuration
+apis:
+  groq:
+    base_url: "https://api.groq.com/openai/v1"
+    timeout: 30
+  
+  hf:
+    base_url: "https://api-inference.huggingface.co"
+    timeout: 30

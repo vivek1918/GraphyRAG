@@ -1,0 +1,63 @@
+# Core Data Science
+numpy
+pandas
+scipy
+
+# ML & NLP
+torch
+transformers
+sentence-transformers
+spacy
+en_core_web_sm
+
+# Document Processing
+pdfminer.six
+pymupdf
+python-docx
+beautifulsoup4
+trafilatura
+readability-lxml
+
+# Multimedia Processing
+opencv-python
+Pillow
+paddleocr
+pytesseract
+openai-whisper
+faster-whisper
+moviepy
+ffmpeg-python
+pyttsx3
+
+# Knowledge Graph
+rdflib
+pyarrow
+networkx
+
+# RAG & Vector Stores
+faiss-cpu
+chromadb
+llama-index
+langchain
+
+# APIs & Web
+fastapi
+uvicorn
+requests
+aiohttp
+
+# Utilities
+pydantic
+pyyaml
+python-dotenv
+tqdm
+loguru
+Jinja2
+
+# Testing
+pytest
+pytest-asyncio
+
+# Data Generation
+faker
+reportlab
