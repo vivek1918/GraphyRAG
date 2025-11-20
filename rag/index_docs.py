@@ -276,8 +276,11 @@ class DocumentIndexer:
             with open(chunks_path, 'r') as f:
                 chunks = json.load(f)
             
-            # Generate query embedding
-            query_embedding = await self._generate_embeddings([query])[0]
+            # Generate query embedding (avoid direct subscript on awaited expression for clarity)
+            emb_list = await self._generate_embeddings([query])
+            if not emb_list:
+                return []
+            query_embedding = emb_list[0]
             query_array = np.array([query_embedding]).astype('float32')
             faiss.normalize_L2(query_array)
             
@@ -316,7 +319,10 @@ class DocumentIndexer:
                 return []
             
             # Generate query embedding
-            query_embedding = await self._generate_embeddings([query])[0]
+            emb_list = await self._generate_embeddings([query])
+            if not emb_list:
+                return []
+            query_embedding = emb_list[0]
             
             # Calculate similarities
             similarities = []

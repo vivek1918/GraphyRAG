@@ -8,7 +8,7 @@ torch
 transformers
 sentence-transformers
 spacy
-en_core_web_sm
+# en_core_web_sm
 
 # Document Processing
 pdfminer.six
@@ -61,3 +61,5 @@ pytest-asyncio
 # Data Generation
 faker
 reportlab
+
+neo4j

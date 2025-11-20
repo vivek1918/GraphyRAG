@@ -8,7 +8,8 @@ Includes Neo4j integration for graph visualization.
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from urllib.parse import quote
 from rdflib import Graph, URIRef, Literal, Namespace
 from rdflib.namespace import RDF, RDFS, OWL, XSD
 from loguru import logger
@@ -35,9 +36,21 @@ class TripleBuilder:
         except Exception as e:
             logger.warning(f"Neo4j initialization failed: {e}")
 
-    async def build_triples(self, documents: List[Dict[str, Any]], output_file: Path) -> Dict[str, int]:
-        """Build RDF triples from enriched documents."""
+    async def build_triples(self, documents: List[Dict[str, Any]], output_file: Path, ontology_file: Optional[Path] = None) -> Dict[str, int]:
+        """Build RDF triples from enriched documents.
+
+        If an ontology_file is provided and exists, preload that ontology (including dynamic extensions)
+        before adding instance data. Otherwise fall back to defining the core ontology locally.
+        """
         graph = Graph()
+
+        # Preload ontology (core + dynamic merged) if supplied
+        if ontology_file and ontology_file.exists():
+            try:
+                graph.parse(str(ontology_file), format="turtle")
+                logger.info(f"Loaded ontology from {ontology_file}")
+            except Exception as e:
+                logger.warning(f"Failed to parse ontology file {ontology_file}: {e}. Falling back to embedded core ontology.")
 
         # Bind namespaces
         graph.bind("kg", self.kg_ns)
@@ -47,8 +60,9 @@ class TripleBuilder:
         graph.bind("rdfs", RDFS)
         graph.bind("xsd", XSD)
 
-        # Define ontology structure
-        self._define_ontology(graph)
+        # Define ontology structure only if we did not preload one
+        if not ontology_file or not ontology_file.exists():
+            self._define_ontology(graph)
 
         total_triples = 0
         entity_count = 0
@@ -60,9 +74,12 @@ class TripleBuilder:
 
         for doc in documents:
             # Create document entity
-            doc_uri = self.doc_ns[doc["doc_id"]]
+            # Ensure a safe URI fragment (encode spaces and special characters)
+            raw_doc_id = str(doc.get("doc_id", "document"))
+            safe_doc_id = quote(raw_doc_id, safe="-_.~")
+            doc_uri = self.doc_ns[safe_doc_id]
             graph.add((doc_uri, RDF.type, self.kg_ns.Document))
-            graph.add((doc_uri, RDFS.label, Literal(f"Document {doc['doc_id']}")))
+            graph.add((doc_uri, RDFS.label, Literal(f"Document {raw_doc_id}")))
             graph.add((doc_uri, self.kg_ns.hasText, Literal(doc.get("content", ""))))
             graph.add((doc_uri, self.kg_ns.sourceType, Literal(doc.get("source_type", "unknown"))))
 
@@ -74,7 +91,7 @@ class TripleBuilder:
                 'id': str(doc_uri),
                 'labels': ['Document'],
                 'properties': {
-                    'doc_id': doc['doc_id'],
+                    'doc_id': raw_doc_id,
                     'source_type': doc.get('source_type', 'unknown'),
                     'content_preview': doc.get('content', '')[:100] + '...' if doc.get('content') else '',
                     'created_at': doc.get('created_at', '')

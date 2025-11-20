@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   fuseki:
@@ -6,15 +6,12 @@ services:
     ports:
       - "3030:3030"
     environment:
-      - ADMIN_PASSWORD=admin
+      - ADMIN_PASSWORD=admin # use ADMIN_PASSWORD for this image
+      - FUSEKI_DATASET_1=kg
     volumes:
       - ./data/fuseki:/fuseki
-      - ./data/staging:/staging
-    command: 
-      - "--mem"
-      - "/kg"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3030/$/ping"]
+      test: ["CMD", "wget", "--spider", "http://localhost:3030/$/ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -22,8 +19,8 @@ services:
   neo4j:
     image: neo4j:5.12-community
     ports:
-      - "7474:7474"  # Neo4j Browser
-      - "7687:7687"  # Neo4j Bolt driver
+      - "7474:7474" # Neo4j Browser
+      - "7687:7687" # Neo4j Bolt driver
     environment:
       - NEO4J_AUTH=neo4j/password
       - NEO4J_PLUGINS=["apoc"]

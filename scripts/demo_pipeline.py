@@ -18,11 +18,12 @@ sys.path.append(str(Path(__file__).parent.parent))
 from loguru import logger
 
 class DemoPipeline:
-    def __init__(self, data_dir: Path = Path("data")):
+    def __init__(self, data_dir: Path = Path("data"), use_existing_data: bool = True):
         self.data_dir = data_dir
         self.raw_dir = data_dir / "raw"
         self.interim_dir = data_dir / "interim"
         self.processed_dir = data_dir / "processed"
+        self.use_existing_data = use_existing_data
         
         # Create directories
         for dir_path in [self.raw_dir, self.interim_dir, self.processed_dir]:
@@ -34,11 +35,13 @@ class DemoPipeline:
     def _initialize_components(self):
         """Initialize all pipeline components."""
         try:
-            from scripts.gen_synth_text import TextDataGenerator
-            from scripts.gen_synth_pdfs import PDFDataGenerator
-            from scripts.gen_synth_images import ImageDataGenerator
-            from scripts.gen_synth_audio import AudioDataGenerator
-            from scripts.gen_synth_video import VideoDataGenerator
+            # Synthetic generators kept optional; not used when use_existing_data=True
+            if not self.use_existing_data:
+                from scripts.gen_synth_text import TextDataGenerator
+                from scripts.gen_synth_pdfs import PDFDataGenerator
+                from scripts.gen_synth_images import ImageDataGenerator
+                from scripts.gen_synth_audio import AudioDataGenerator
+                from scripts.gen_synth_video import VideoDataGenerator
 
             from ingest.parse_text import TextParser
             from ingest.parse_pdf import PDFParser
@@ -56,14 +59,17 @@ class DemoPipeline:
             from rag.index_docs import DocumentIndexer
             from rag.graph_rag import GraphRAG
             
-            self.generators = {
-                'text': TextDataGenerator(self.raw_dir / "text"),
-                'pdf': PDFDataGenerator(self.raw_dir / "pdf"), 
-                'image': ImageDataGenerator(self.raw_dir / "img"),
-                'audio': AudioDataGenerator(self.raw_dir / "audio"),
-                'video': VideoDataGenerator(self.raw_dir / "video")
-            }
-            
+            if not self.use_existing_data:
+                self.generators = {
+                    'text': TextDataGenerator(self.raw_dir / "text"),
+                    'pdf': PDFDataGenerator(self.raw_dir / "pdf"), 
+                    'image': ImageDataGenerator(self.raw_dir / "img"),
+                    'audio': AudioDataGenerator(self.raw_dir / "audio"),
+                    'video': VideoDataGenerator(self.raw_dir / "video")
+                }
+            else:
+                self.generators = {}  # Not used
+
             self.parsers = {
                 'text': TextParser(),
                 'pdf': PDFParser(),
@@ -87,8 +93,44 @@ class DemoPipeline:
             logger.error(f"Failed to initialize components: {e}")
             raise
 
+    def _find_pdf_dir(self) -> Path:
+        # Prefer data/raw/pdf if populated, else data/pdf
+        candidates = [self.raw_dir / "pdf", self.data_dir / "pdf"]
+        for c in candidates:
+            if c.exists() and any(c.glob("*.pdf")):
+                return c
+        # Fallback: create raw/pdf
+        target = self.raw_dir / "pdf"
+        target.mkdir(parents=True, exist_ok=True)
+        return target
+
+    def load_existing_pdfs(self) -> list[dict]:
+        pdf_dir = self._find_pdf_dir()
+        pdf_docs: list[dict] = []
+        for f in sorted(pdf_dir.glob("*.pdf")):
+            pdf_docs.append({
+                "doc_id": f.stem,
+                "type": "pdf_document",
+                "file_path": str(f),        # used by PDFParser
+                "title": f.stem,
+                "source": "existing_dataset",
+                "created_at": datetime.now().isoformat()
+            })
+        if not pdf_docs:
+            logger.warning(f"No PDF files found in {pdf_dir}")
+        else:
+            logger.info(f"Loaded {len(pdf_docs)} existing PDF files from {pdf_dir}")
+        return pdf_docs
+
     async def generate_data(self) -> Dict[str, List[Dict]]:
-        """Generate synthetic multi-modal dataset."""
+        """Load existing PDFs (and optionally other types) or generate synthetic."""
+        if self.use_existing_data:
+            logger.info("Using existing data from disk (PDFs only).")
+            datasets: Dict[str, List[Dict]] = {}
+            datasets['pdf'] = self.load_existing_pdfs()
+            # Optional: load other modalities similarly if needed
+            return datasets
+        
         logger.info("Generating synthetic datasets...")
         
         datasets = {}
@@ -190,41 +232,93 @@ class DemoPipeline:
     async def extract_entities_relations(self, parsed_docs: List[Dict]) -> List[Dict]:
         """Extract entities and relations from parsed documents."""
         logger.info("Extracting entities and relations...")
-        
-        enriched_docs = []
-        
-        for doc in parsed_docs:
+
+        enriched_docs: List[Dict] = []
+        total = len(parsed_docs)
+        total_entities = 0
+        total_relations = 0
+        t0 = time.perf_counter()
+
+        for idx, doc in enumerate(parsed_docs, start=1):
+            doc_id = doc.get("doc_id", f"doc_{idx}")
+            content_len = len(doc.get("content", "") or "")
             try:
-                # Extract entities
+                # NER
+                logger.info(f"[{idx}/{total}] NER start: {doc_id} (chars={content_len})")
+                t_ner = time.perf_counter()
                 entities = await self.extractors['ner'].extract(doc)
+                ner_dt = time.perf_counter() - t_ner
                 doc['extracted_entities'] = entities
-                
-                # Extract relations
+                total_entities += len(entities or [])
+                logger.info(f"[{idx}/{total}] NER done: {doc_id} in {ner_dt:.2f}s, entities={len(entities or [])}")
+
+                # Relation Extraction
+                logger.info(f"[{idx}/{total}] RE start:  {doc_id}")
+                t_re = time.perf_counter()
                 relations = await self.extractors['relation'].extract(doc)
+                re_dt = time.perf_counter() - t_re
                 doc['extracted_relations'] = relations
-                
-                # Link entities
+                total_relations += len(relations or [])
+                logger.info(f"[{idx}/{total}] RE done:  {doc_id} in {re_dt:.2f}s, relations={len(relations or [])}")
+
+                # Entity Linking
+                logger.info(f"[{idx}/{total}] Link start: {doc_id}")
+                t_link = time.perf_counter()
                 linked_entities = await self.extractors['linker'].link(doc)
+                link_dt = time.perf_counter() - t_link
                 doc['linked_entities'] = linked_entities
-                
+                if isinstance(linked_entities, dict) and 'linked_entities' in linked_entities:
+                    link_count = len(linked_entities['linked_entities'] or [])
+                elif isinstance(linked_entities, list):
+                    link_count = len(linked_entities)
+                else:
+                    link_count = 0
+                logger.info(f"[{idx}/{total}] Link done: {doc_id} in {link_dt:.2f}s, linked={link_count}")
+
                 enriched_docs.append(doc)
-                logger.debug(f"Extracted from {doc['doc_id']}: {len(entities)} entities, {len(relations)} relations")
-                
+                logger.debug(f"Extracted from {doc_id}: entities={len(entities or [])}, relations={len(relations or [])}")
             except Exception as e:
-                logger.error(f"Error extracting from {doc['doc_id']}: {e}")
-                # Keep document without extraction
+                logger.error(f"[{idx}/{total}] Extraction error in {doc_id}: {e}")
                 doc['extracted_entities'] = []
                 doc['extracted_relations'] = []
                 doc['linked_entities'] = {'linked_entities': []}
                 enriched_docs.append(doc)
-        
-        # Save enriched documents
+            finally:
+                if idx % 5 == 0 or idx == total:
+                    elapsed = time.perf_counter() - t0
+                    logger.info(f"Progress: {idx}/{total} docs, elapsed={elapsed:.2f}s, total_entities={total_entities}, total_relations={total_relations}")
+
+        # Dynamic Ontology Generation & Merge
+        try:
+            from ontology.dynamic_ontology_generator import (
+                build_dynamic_ontology,
+                merge_ontologies,
+            )
+
+            dynamic_file = self.processed_dir / "dynamic.ttl"
+            core_file = Path("ontology/core.ttl")
+            updated_core_file = self.processed_dir / "updated_core.ttl"
+
+            build_dynamic_ontology(enriched_docs, dynamic_file)
+            logger.info("Dynamic ontology generated")
+            merge_ontologies(core_file, dynamic_file, updated_core_file)
+            logger.info("Core ontology updated and merged")
+            # Store path for subsequent KG build step
+            self.updated_core_file = updated_core_file
+        except Exception as e:
+            logger.error(f"Dynamic ontology step failed: {e}")
+            self.updated_core_file = Path("ontology/core.ttl")  # fallback
+
         enriched_file = self.interim_dir / "enriched_documents.jsonl"
         with open(enriched_file, 'w', encoding='utf-8') as f:
             for doc in enriched_docs:
                 f.write(json.dumps(doc) + '\n')
-                
-        logger.info(f"Processed {len(enriched_docs)} documents with extraction")
+
+        elapsed = time.perf_counter() - t0
+        logger.info(
+            f"Processed {len(enriched_docs)} documents with extraction in {elapsed:.2f}s "
+            f"(entities={total_entities}, relations={total_relations})"
+        )
         return enriched_docs
 
     async def build_knowledge_graph(self, enriched_docs: List[Dict]):
@@ -234,7 +328,9 @@ class DemoPipeline:
         try:
             # Convert to RDF triples
             triples_file = self.processed_dir / "knowledge_graph.ttl"
-            stats = await self.kg_builder.build_triples(enriched_docs, triples_file)
+            # Select ontology file (dynamic merged if available)
+            ontology_file = getattr(self, "updated_core_file", Path("ontology/core.ttl"))
+            stats = await self.kg_builder.build_triples(enriched_docs, triples_file, ontology_file=ontology_file)
             
             # Load into Fuseki
             success = await self.fuseki_client.load_triples(triples_file)
@@ -296,10 +392,16 @@ class DemoPipeline:
         for query_info in queries:
             try:
                 results = await self.fuseki_client.query(query_info["query"])
-                logger.info(f"Query '{query_info['name']}': {len(results)} results")
-                
-                if results:
-                    logger.info(f"Sample results: {results[:2]}")
+                if not results:
+                    logger.info(f"Query '{query_info['name']}': 0 results")
+                    continue
+                bindings = []
+                if isinstance(results, dict):
+                    bindings = results.get('results', {}).get('bindings', [])
+                count = len(bindings)
+                logger.info(f"Query '{query_info['name']}': {count} results")
+                if count:
+                    logger.info(f"Sample results: {bindings[:2]}")
             except Exception as e:
                 logger.warning(f"Query '{query_info['name']}' failed: {e}")
 
@@ -400,7 +502,7 @@ async def main():
     logger.remove()  # Remove default handler
     logger.add(sys.stderr, level="INFO", format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
     
-    pipeline = DemoPipeline()
+    pipeline = DemoPipeline(use_existing_data=True)
     await pipeline.run()
 
 if __name__ == "__main__":

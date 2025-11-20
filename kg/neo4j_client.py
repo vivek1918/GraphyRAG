@@ -110,9 +110,14 @@ class Neo4jClient:
         formatted = []
         for key, value in properties.items():
             if isinstance(value, str):
-                formatted.append(f"{key}: '{value.replace("'", "\\'")}'")
+                escaped = value.replace("'", "\\'")
+                formatted.append(f"{key}: '{escaped}'")
+            elif isinstance(value, bool):
+                # Cypher expects lower-case true/false
+                formatted.append(f"{key}: {str(value).lower()}")
             else:
-                formatted.append(f"{key}: {value}")
+                # Use json.dumps for numbers, lists, dicts to produce valid literal
+                formatted.append(f"{key}: {json.dumps(value)}")
         
         return "{" + ", ".join(formatted) + "}"
     
