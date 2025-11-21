@@ -103,6 +103,45 @@ class TripleBuilder:
             if not entities:  # fallback if not resolved_entities exists
                 entities = doc.get("extracted_entities", doc.get("entities", []))
 
+            # Process domain-specific entities first (structured)
+            domain_entities_data = doc.get("domain_entities", {})
+            domain_entities = domain_entities_data.get("entities", [])
+            for entity in domain_entities:
+                entity_uri = await self.add_domain_entity(graph, entity, doc_uri)
+                if entity_uri:
+                    entity_count += 1
+                    
+                    # Add Neo4j entity node
+                    neo4j_nodes.append({
+                        'id': str(entity_uri),
+                        'labels': [self._get_domain_label(entity.get('type', 'Entity'))],
+                        'properties': {
+                            'name': self._get_entity_name(entity),
+                            'entity_type': entity.get('type', 'Entity'),
+                            'confidence': entity.get('confidence', 0.9),
+                            **entity.get('fields', {})  # Include all structured fields
+                        }
+                    })
+                    
+                    # Add Neo4j relationship: Document -> mentions -> Entity
+                    neo4j_relationships.append({
+                        'start_node': str(doc_uri),
+                        'end_node': str(entity_uri),
+                        'type': 'MENTIONS',
+                        'properties': {
+                            'source': 'domain_extraction',
+                            'extraction_method': 'domain_specific'
+                        }
+                    })
+                    
+                    # Add relations for domain entities
+                    for relation in entity.get('relations', []):
+                        # Handle internal domain relations
+                        if relation.get('target'):
+                            # This will be created when target entity is processed
+                            pass
+
+            # Process generic NER entities
             for entity in entities:
                 entity_uri = await self.add_entity(graph, entity, doc_uri)
                 if entity_uri:
@@ -210,6 +249,75 @@ class TripleBuilder:
             'CONCEPT': 'Concept'
         }
         return type_map.get(entity_type.upper(), 'Entity')
+    
+    def _get_domain_label(self, entity_type: str) -> str:
+        """Convert domain entity type to Neo4j label."""
+        # Domain types are already in proper case from schema
+        return entity_type
+    
+    def _get_entity_name(self, entity: Dict[str, Any]) -> str:
+        """Extract name from domain entity fields."""
+        fields = entity.get('fields', {})
+        # Try common name fields
+        for name_field in ['name', 'title', 'company', 'institution', 'description']:
+            if fields.get(name_field):
+                return str(fields[name_field])
+        return entity.get('id', 'Unnamed')
+
+    async def add_domain_entity(self, graph: Graph, entity: Dict[str, Any], doc_uri: URIRef) -> URIRef:
+        """Add a domain-specific entity to the graph with structured fields."""
+        try:
+            # Create entity URI
+            entity_id = entity.get("id", str(uuid.uuid4()))
+            safe_id = quote(str(entity_id), safe="-_.~")
+            entity_uri = self.entity_ns[safe_id]
+
+            # Add entity type (domain-specific class)
+            entity_type = entity.get("type", "Entity")
+            graph.add((entity_uri, RDF.type, self.kg_ns[entity_type]))
+
+            # Add label
+            entity_name = self._get_entity_name(entity)
+            graph.add((entity_uri, RDFS.label, Literal(entity_name)))
+
+            # Link to document
+            graph.add((entity_uri, self.kg_ns.extractedFrom, doc_uri))
+            graph.add((doc_uri, self.kg_ns.mentions, entity_uri))
+
+            # Add all structured fields as datatype properties
+            fields = entity.get("fields", {})
+            for field_name, field_value in fields.items():
+                if field_value is not None:
+                    # Convert field name to property URI
+                    prop_name = ''.join(word.capitalize() for word in field_name.split('_'))
+                    prop_uri = self.kg_ns[f"has{prop_name}"]
+                    
+                    # Handle different value types
+                    if isinstance(field_value, list):
+                        # Add each list item as separate triple
+                        for item in field_value:
+                            graph.add((entity_uri, prop_uri, Literal(str(item))))
+                    elif isinstance(field_value, dict):
+                        # Serialize dict as JSON string
+                        import json
+                        graph.add((entity_uri, prop_uri, Literal(json.dumps(field_value))))
+                    else:
+                        graph.add((entity_uri, prop_uri, Literal(str(field_value))))
+
+            # Add confidence
+            confidence = entity.get("confidence", 0.9)
+            graph.add((entity_uri, self.kg_ns.hasConfidence, Literal(confidence, datatype=XSD.float)))
+
+            # Add source text if available
+            source_text = entity.get("source_text")
+            if source_text:
+                graph.add((entity_uri, self.kg_ns.hasSourceText, Literal(source_text)))
+
+            return entity_uri
+
+        except Exception as e:
+            logger.error(f"Error adding domain entity {entity}: {e}")
+            return None
 
     async def add_entity(self, graph: Graph, entity: Dict[str, Any], doc_uri: URIRef) -> URIRef:
         """Add an entity to the graph."""

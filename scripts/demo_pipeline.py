@@ -237,13 +237,36 @@ class DemoPipeline:
         total = len(parsed_docs)
         total_entities = 0
         total_relations = 0
+        total_domain_entities = 0
         t0 = time.perf_counter()
+
+        # Import domain extraction modules
+        from extract.document_classifier import classify_document
+        from extract.domain_extractors import extract_domain_entities
 
         for idx, doc in enumerate(parsed_docs, start=1):
             doc_id = doc.get("doc_id", f"doc_{idx}")
             content_len = len(doc.get("content", "") or "")
             try:
-                # NER
+                # Step 1: Document Classification
+                logger.info(f"[{idx}/{total}] Classification start: {doc_id}")
+                t_class = time.perf_counter()
+                doc = await classify_document(doc, mode="hybrid")
+                class_dt = time.perf_counter() - t_class
+                domain = doc.get('domain_classification', {}).get('domain', 'general')
+                confidence = doc.get('domain_classification', {}).get('confidence', 0.0)
+                logger.info(f"[{idx}/{total}] Classification done: {doc_id} in {class_dt:.2f}s, domain={domain} (conf={confidence:.2f})")
+
+                # Step 2: Domain-Specific Extraction
+                logger.info(f"[{idx}/{total}] Domain extraction start: {doc_id}")
+                t_domain = time.perf_counter()
+                doc = await extract_domain_entities(doc, mode="groq")
+                domain_dt = time.perf_counter() - t_domain
+                domain_entities = doc.get('domain_entities', {}).get('entities', [])
+                total_domain_entities += len(domain_entities or [])
+                logger.info(f"[{idx}/{total}] Domain extraction done: {doc_id} in {domain_dt:.2f}s, domain_entities={len(domain_entities or [])}")
+
+                # Step 3: NER (Generic Extraction)
                 logger.info(f"[{idx}/{total}] NER start: {doc_id} (chars={content_len})")
                 t_ner = time.perf_counter()
                 entities = await self.extractors['ner'].extract(doc)
@@ -252,7 +275,7 @@ class DemoPipeline:
                 total_entities += len(entities or [])
                 logger.info(f"[{idx}/{total}] NER done: {doc_id} in {ner_dt:.2f}s, entities={len(entities or [])}")
 
-                # Relation Extraction
+                # Step 4: Relation Extraction
                 logger.info(f"[{idx}/{total}] RE start:  {doc_id}")
                 t_re = time.perf_counter()
                 relations = await self.extractors['relation'].extract(doc)
@@ -261,7 +284,7 @@ class DemoPipeline:
                 total_relations += len(relations or [])
                 logger.info(f"[{idx}/{total}] RE done:  {doc_id} in {re_dt:.2f}s, relations={len(relations or [])}")
 
-                # Entity Linking
+                # Step 5: Entity Linking
                 logger.info(f"[{idx}/{total}] Link start: {doc_id}")
                 t_link = time.perf_counter()
                 linked_entities = await self.extractors['linker'].link(doc)
@@ -276,38 +299,36 @@ class DemoPipeline:
                 logger.info(f"[{idx}/{total}] Link done: {doc_id} in {link_dt:.2f}s, linked={link_count}")
 
                 enriched_docs.append(doc)
-                logger.debug(f"Extracted from {doc_id}: entities={len(entities or [])}, relations={len(relations or [])}")
+                logger.debug(f"Extracted from {doc_id}: domain_entities={len(domain_entities or [])}, entities={len(entities or [])}, relations={len(relations or [])}")
             except Exception as e:
                 logger.error(f"[{idx}/{total}] Extraction error in {doc_id}: {e}")
                 doc['extracted_entities'] = []
                 doc['extracted_relations'] = []
                 doc['linked_entities'] = {'linked_entities': []}
+                doc['domain_entities'] = {'entities': []}
                 enriched_docs.append(doc)
             finally:
                 if idx % 5 == 0 or idx == total:
                     elapsed = time.perf_counter() - t0
-                    logger.info(f"Progress: {idx}/{total} docs, elapsed={elapsed:.2f}s, total_entities={total_entities}, total_relations={total_relations}")
+                    logger.info(f"Progress: {idx}/{total} docs, elapsed={elapsed:.2f}s, domain_entities={total_domain_entities}, entities={total_entities}, relations={total_relations}")
 
-        # Dynamic Ontology Generation & Merge
+        # Dataset-specific Dynamic Ontology Generation (no core overwrite)
         try:
             from ontology.dynamic_ontology_generator import (
-                build_dynamic_ontology,
-                merge_ontologies,
+                build_dataset_ontologies,
             )
 
-            dynamic_file = self.processed_dir / "dynamic.ttl"
             core_file = Path("ontology/core.ttl")
-            updated_core_file = self.processed_dir / "updated_core.ttl"
-
-            build_dynamic_ontology(enriched_docs, dynamic_file)
-            logger.info("Dynamic ontology generated")
-            merge_ontologies(core_file, dynamic_file, updated_core_file)
-            logger.info("Core ontology updated and merged")
-            # Store path for subsequent KG build step
-            self.updated_core_file = updated_core_file
+            ontology_dir = Path("ontology")
+            dataset_ont_map = build_dataset_ontologies(enriched_docs, core_file=core_file, output_dir=ontology_dir)
+            self.dataset_ontologies = dataset_ont_map
+            # Use combined ontology for triple building convenience
+            self.combined_ontology_file = dataset_ont_map.get("__combined__", core_file)
+            logger.info(f"Dataset ontologies generated: { {k: str(v) for k,v in dataset_ont_map.items() if k!='__combined__'} }")
+            logger.info(f"Combined ontology available at {self.combined_ontology_file}")
         except Exception as e:
-            logger.error(f"Dynamic ontology step failed: {e}")
-            self.updated_core_file = Path("ontology/core.ttl")  # fallback
+            logger.error(f"Dataset ontology generation failed: {e}")
+            self.combined_ontology_file = Path("ontology/core.ttl")  # fallback
 
         enriched_file = self.interim_dir / "enriched_documents.jsonl"
         with open(enriched_file, 'w', encoding='utf-8') as f:
@@ -329,7 +350,7 @@ class DemoPipeline:
             # Convert to RDF triples
             triples_file = self.processed_dir / "knowledge_graph.ttl"
             # Select ontology file (dynamic merged if available)
-            ontology_file = getattr(self, "updated_core_file", Path("ontology/core.ttl"))
+            ontology_file = getattr(self, "combined_ontology_file", Path("ontology/core.ttl"))
             stats = await self.kg_builder.build_triples(enriched_docs, triples_file, ontology_file=ontology_file)
             
             # Load into Fuseki
@@ -415,25 +436,116 @@ class DemoPipeline:
         except Exception as e:
             logger.error(f"Error building RAG index: {e}")
 
-    async def demo_graph_rag(self):
-        """Demonstrate GraphRAG capabilities."""
+    async def demo_graph_rag(self, interactive: bool = True):
+        """Demonstrate GraphRAG capabilities with interactive or example queries."""
         logger.info("Demonstrating GraphRAG...")
         
-        questions = [
-            "Who works for TechCorp?",
-            "What events happened in New York?",
-            "Find people who are CEOs"
-        ]
+        if interactive:
+            logger.info("\n" + "="*70)
+            logger.info("🤖 Interactive GraphRAG Query Mode")
+            logger.info("="*70)
+            print("\n📚 You can now query your knowledge graph!")
+            print("\n💡 Example queries based on your document type:")
+            print("  • Resume/CV:")
+            print("    - What skills does [person name] have?")
+            print("    - Find all people with [skill name]")
+            print("    - Where did [person] work?")
+            print("  • Research Papers:")
+            print("    - What are the findings about [topic]?")
+            print("    - Who are the authors of [paper]?")
+            print("    - What methodologies were used for [research area]?")
+            print("  • Business Reports:")
+            print("    - What companies are mentioned?")
+            print("    - Find all financial metrics for [company]")
+            print("    - What are the recommendations?")
+            print("  • General:")
+            print("    - Who works for [company name]?")
+            print("    - What events happened in [location]?")
+            print("    - Find people who are [job title]")
+            print("\n⌨️  Type 'exit', 'quit', or press Ctrl+C to stop.\n")
+            
+            query_count = 0
+            while True:
+                try:
+                    question = input("🔍 Enter your question: ").strip()
+                    
+                    if not question:
+                        print("⚠️  Please enter a question.\n")
+                        continue
+                    
+                    if question.lower() in ['exit', 'quit', 'q', 'bye']:
+                        logger.info("Exiting interactive mode...")
+                        print(f"\n👋 Goodbye! You asked {query_count} questions.\n")
+                        break
+                    
+                    query_count += 1
+                    logger.info(f"[Query #{query_count}] Processing: {question}")
+                    
+                    # Show processing indicator
+                    print("⏳ Searching knowledge graph...", end='', flush=True)
+                    
+                    start_time = time.time()
+                    answer = await self.graph_rag.query(question)
+                    elapsed = time.time() - start_time
+                    
+                    print("\r" + " " * 50 + "\r", end='')  # Clear loading message
+                    
+                    print("\n" + "─"*70)
+                    print(f"📊 Answer ({elapsed:.2f}s):")
+                    print(f"   {answer['answer']}")
+                    
+                    if answer.get('sources'):
+                        print(f"\n📚 Sources: {len(answer['sources'])} entities/relations found")
+                        # Show first few sources
+                        for i, source in enumerate(answer['sources'][:3], 1):
+                            if isinstance(source, dict):
+                                source_text = source.get('text', str(source))[:100]
+                                print(f"   [{i}] {source_text}...")
+                            else:
+                                print(f"   [{i}] {str(source)[:100]}...")
+                        
+                        if len(answer['sources']) > 3:
+                            print(f"   ... and {len(answer['sources']) - 3} more")
+                    
+                    if answer.get('context'):
+                        print(f"\n💡 Context: {len(answer['context'])} relevant passages")
+                    
+                    print("─"*70 + "\n")
+                    
+                except KeyboardInterrupt:
+                    print("\n\n⚠️  Interrupted by user. Exiting...")
+                    print(f"👋 You asked {query_count} questions. Goodbye!\n")
+                    break
+                    
+                except EOFError:
+                    print("\n\n⚠️  End of input. Exiting...")
+                    print(f"👋 You asked {query_count} questions. Goodbye!\n")
+                    break
+                    
+                except Exception as e:
+                    logger.error(f"Query failed: {e}")
+                    print(f"\n❌ Error processing your question: {e}")
+                    print("Please try rephrasing or ask a different question.\n")
         
-        for question in questions:
-            try:
-                answer = await self.graph_rag.query(question)
-                logger.info(f"Q: {question}")
-                logger.info(f"A: {answer['answer']}")
-                if answer.get('sources'):
-                    logger.info(f"Sources: {len(answer['sources'])} entities/citations")
-            except Exception as e:
-                logger.error(f"GraphRAG query failed for '{question}': {e}")
+        else:
+            # Non-interactive mode with example questions
+            logger.info("Running in non-interactive mode with example queries...")
+            
+            questions = [
+                "Who works for TechCorp?",
+                "What events happened in New York?",
+                "Find people who are CEOs"
+            ]
+            
+            for idx, question in enumerate(questions, 1):
+                try:
+                    logger.info(f"[{idx}/{len(questions)}] Q: {question}")
+                    answer = await self.graph_rag.query(question)
+                    logger.info(f"A: {answer['answer']}")
+                    if answer.get('sources'):
+                        logger.info(f"Sources: {len(answer['sources'])} entities/citations")
+                except Exception as e:
+                    logger.error(f"GraphRAG query failed for '{question}': {e}")
 
     async def generate_report(self, stats: Dict[str, Any]):
         """Generate demo report."""

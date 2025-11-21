@@ -1,6 +1,6 @@
 # System Configuration
 system:
-  mode: "local"  # local, groq, hf
+  mode: "groq" # local, groq, hf
   data_dir: "./data"
   log_level: "INFO"
 
@@ -9,17 +9,17 @@ models:
   embeddings:
     local: "sentence-transformers/all-MiniLM-L6-v2"
     hf: "sentence-transformers/all-MiniLM-L6-v2"
-  
+
   ner:
     local: "dslim/bert-base-NER"
     hf: "dslim/bert-base-NER"
-  
+
   relation:
     local: "microsoft/DialoGPT-medium"
     hf: "microsoft/DialoGPT-medium"
-  
+
   llm:
-    groq: "llama3.1-8b-8192"
+    groq: "openai/gpt-oss-120b"
     local: "llama-7b-q4.gguf"
 
 # Processing Configuration
@@ -46,7 +46,7 @@ kg:
 
 # RAG Configuration
 rag:
-  vector_store: "faiss"  # faiss, chroma
+  vector_store: "faiss" # faiss, chroma
   top_k: 5
   similarity_threshold: 0.7
 
@@ -55,7 +55,7 @@ apis:
   groq:
     base_url: "https://api.groq.com/openai/v1"
     timeout: 30
-  
+
   hf:
     base_url: "https://api-inference.huggingface.co"
     timeout: 30

@@ -149,3 +149,279 @@
   rdfs:label "extraction method" ;
   rdfs:domain :Entity ;
   rdfs:range xsd:string .
+
+### Domain-Specific Classes ###
+
+# Resume Domain
+:Resume a owl:Class ;
+  rdfs:label "Resume" ;
+  rdfs:subClassOf :Document ;
+  rdfs:comment "Curriculum vitae or resume document" .
+
+:Skill a owl:Class ;
+  rdfs:label "Skill" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Technical or soft skill" .
+
+:WorkExperience a owl:Class ;
+  rdfs:label "Work Experience" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Job or work experience entry" .
+
+:Education a owl:Class ;
+  rdfs:label "Education" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Educational qualification" .
+
+:Certification a owl:Class ;
+  rdfs:label "Certification" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Professional certification or license" .
+
+:Project a owl:Class ;
+  rdfs:label "Project" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Personal or professional project" .
+
+# Research Paper Domain
+:ResearchPaper a owl:Class ;
+  rdfs:label "Research Paper" ;
+  rdfs:subClassOf :Document ;
+  rdfs:comment "Academic research paper or article" .
+
+:Author a owl:Class ;
+  rdfs:label "Author" ;
+  rdfs:subClassOf :Person ;
+  rdfs:comment "Research paper author" .
+
+:Methodology a owl:Class ;
+  rdfs:label "Methodology" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Research methodology or approach" .
+
+:Finding a owl:Class ;
+  rdfs:label "Finding" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Research finding or result" .
+
+:Citation a owl:Class ;
+  rdfs:label "Citation" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Cited work or reference" .
+
+:ResearchTopic a owl:Class ;
+  rdfs:label "Research Topic" ;
+  rdfs:subClassOf :Concept ;
+  rdfs:comment "Research topic or domain" .
+
+# Business Report Domain
+:BusinessReport a owl:Class ;
+  rdfs:label "Business Report" ;
+  rdfs:subClassOf :Document ;
+  rdfs:comment "Business or financial report" .
+
+:Company a owl:Class ;
+  rdfs:label "Company" ;
+  rdfs:subClassOf :Organization ;
+  rdfs:comment "Company or business entity" .
+
+:FinancialMetric a owl:Class ;
+  rdfs:label "Financial Metric" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Financial metric or KPI" .
+
+:MarketSegment a owl:Class ;
+  rdfs:label "Market Segment" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Market or industry segment" .
+
+:Recommendation a owl:Class ;
+  rdfs:label "Recommendation" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Business recommendation or action item" .
+
+# Technical Documentation Domain
+:TechnicalDocumentation a owl:Class ;
+  rdfs:label "Technical Documentation" ;
+  rdfs:subClassOf :Document ;
+  rdfs:comment "API documentation or technical manual" .
+
+:API a owl:Class ;
+  rdfs:label "API" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Application Programming Interface" .
+
+:Endpoint a owl:Class ;
+  rdfs:label "Endpoint" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "API endpoint or route" .
+
+:Parameter a owl:Class ;
+  rdfs:label "Parameter" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Function or API parameter" .
+
+# Legal Document Domain
+:LegalDocument a owl:Class ;
+  rdfs:label "Legal Document" ;
+  rdfs:subClassOf :Document ;
+  rdfs:comment "Legal contract or agreement" .
+
+:Party a owl:Class ;
+  rdfs:label "Party" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Legal party in agreement" .
+
+:Clause a owl:Class ;
+  rdfs:label "Clause" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Contract clause or term" .
+
+:Obligation a owl:Class ;
+  rdfs:label "Obligation" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Legal obligation or duty" .
+
+# Medical Document Domain
+:MedicalDocument a owl:Class ;
+  rdfs:label "Medical Document" ;
+  rdfs:subClassOf :Document ;
+  rdfs:comment "Medical record or clinical note" .
+
+:Patient a owl:Class ;
+  rdfs:label "Patient" ;
+  rdfs:subClassOf :Person ;
+  rdfs:comment "Patient" .
+
+:Diagnosis a owl:Class ;
+  rdfs:label "Diagnosis" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Medical diagnosis" .
+
+:Treatment a owl:Class ;
+  rdfs:label "Treatment" ;
+  rdfs:subClassOf :Entity ;
+  rdfs:comment "Medical treatment or intervention" .
+
+### Domain-Specific Properties ###
+
+# Resume Properties
+:hasSkill a owl:ObjectProperty ;
+  rdfs:label "has skill" ;
+  rdfs:domain :Person ;
+  rdfs:range :Skill .
+
+:workedAt a owl:ObjectProperty ;
+  rdfs:label "worked at" ;
+  rdfs:domain :Person ;
+  rdfs:range :WorkExperience .
+
+:studiedAt a owl:ObjectProperty ;
+  rdfs:label "studied at" ;
+  rdfs:domain :Person ;
+  rdfs:range :Education .
+
+:hasCertification a owl:ObjectProperty ;
+  rdfs:label "has certification" ;
+  rdfs:domain :Person ;
+  rdfs:range :Certification .
+
+:usedSkill a owl:ObjectProperty ;
+  rdfs:label "used skill" ;
+  rdfs:domain :WorkExperience ;
+  rdfs:range :Skill .
+
+:atCompany a owl:ObjectProperty ;
+  rdfs:label "at company" ;
+  rdfs:domain :WorkExperience ;
+  rdfs:range :Organization .
+
+# Research Paper Properties
+:authoredBy a owl:ObjectProperty ;
+  rdfs:label "authored by" ;
+  rdfs:domain :ResearchPaper ;
+  rdfs:range :Author .
+
+:cites a owl:ObjectProperty ;
+  rdfs:label "cites" ;
+  rdfs:domain :ResearchPaper ;
+  rdfs:range :Citation .
+
+:usesMethodology a owl:ObjectProperty ;
+  rdfs:label "uses methodology" ;
+  rdfs:domain :ResearchPaper ;
+  rdfs:range :Methodology .
+
+:hasFinding a owl:ObjectProperty ;
+  rdfs:label "has finding" ;
+  rdfs:domain :ResearchPaper ;
+  rdfs:range :Finding .
+
+:studiesTopi a owl:ObjectProperty ;
+  rdfs:label "studies topic" ;
+  rdfs:domain :ResearchPaper ;
+  rdfs:range :ResearchTopic .
+
+:affiliatedWith a owl:ObjectProperty ;
+  rdfs:label "affiliated with" ;
+  rdfs:domain :Author ;
+  rdfs:range :Organization .
+
+# Business Report Properties
+:hasMetric a owl:ObjectProperty ;
+  rdfs:label "has metric" ;
+  rdfs:domain :Company ;
+  rdfs:range :FinancialMetric .
+
+:operatesInSector a owl:ObjectProperty ;
+  rdfs:label "operates in sector" ;
+  rdfs:domain :Company ;
+  rdfs:range :MarketSegment .
+
+:competesWith a owl:ObjectProperty ;
+  rdfs:label "competes with" ;
+  rdfs:domain :Company ;
+  rdfs:range :Company .
+
+# Technical Documentation Properties
+:hasEndpoint a owl:ObjectProperty ;
+  rdfs:label "has endpoint" ;
+  rdfs:domain :API ;
+  rdfs:range :Endpoint .
+
+:acceptsParameter a owl:ObjectProperty ;
+  rdfs:label "accepts parameter" ;
+  rdfs:domain :Endpoint ;
+  rdfs:range :Parameter .
+
+# Legal Document Properties
+:partyTo a owl:ObjectProperty ;
+  rdfs:label "party to" ;
+  rdfs:domain :Party ;
+  rdfs:range :LegalDocument .
+
+:hasClause a owl:ObjectProperty ;
+  rdfs:label "has clause" ;
+  rdfs:domain :LegalDocument ;
+  rdfs:range :Clause .
+
+:hasObligation a owl:ObjectProperty ;
+  rdfs:label "has obligation" ;
+  rdfs:domain :Party ;
+  rdfs:range :Obligation .
+
+# Medical Document Properties
+:hasCondition a owl:ObjectProperty ;
+  rdfs:label "has condition" ;
+  rdfs:domain :Patient ;
+  rdfs:range :Diagnosis .
+
+:treatedWith a owl:ObjectProperty ;
+  rdfs:label "treated with" ;
+  rdfs:domain :Diagnosis ;
+  rdfs:range :Treatment .
+
+:prescribedTo a owl:ObjectProperty ;
+  rdfs:label "prescribed to" ;
+  rdfs:domain :Treatment ;
+  rdfs:range :Patient .

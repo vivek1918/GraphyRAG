@@ -1,0 +1,36 @@
+@prefix kg: <http://kg.example.org/ontology/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+kg:CombinedOntology a owl:Ontology ;
+    rdfs:comment "Union of 1 dataset ontologies" ;
+    owl:versionInfo "combined-2025-11-21T20:10:00.128325" .
+
+kg:Concept a owl:Class ;
+    rdfs:label "Concept" .
+
+kg:Event a owl:Class ;
+    rdfs:label "Event" .
+
+kg:LOCATED_IN a owl:ObjectProperty ;
+    rdfs:label "LOCATED_IN" .
+
+kg:Ontology_pdf a owl:Ontology ;
+    rdfs:comment "Standalone ontology for pdf dataset with 8 documents" ;
+    owl:versionInfo "pdf-2025-11-21T20:10:00.125512" .
+
+kg:Organization a owl:Class ;
+    rdfs:label "Organization" .
+
+kg:Person a owl:Class ;
+    rdfs:label "Person" .
+
+kg:Place a owl:Class ;
+    rdfs:label "Place" .
+
+kg:RELATED_TO a owl:ObjectProperty ;
+    rdfs:label "RELATED_TO" .
+
+kg:WORKS_FOR a owl:ObjectProperty ;
+    rdfs:label "WORKS_FOR" .
+
