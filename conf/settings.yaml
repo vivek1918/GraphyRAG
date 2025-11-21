@@ -19,7 +19,7 @@ models:
     hf: "microsoft/DialoGPT-medium"
 
   llm:
-    groq: "openai/gpt-oss-120b"
+    groq: "llama3-8b-8192"  # Changed to a valid Groq model
     local: "llama-7b-q4.gguf"
 
 # Processing Configuration
@@ -42,7 +42,7 @@ kg:
   dataset: "kg"
   neo4j_url: "bolt://localhost:7687"
   neo4j_user: "neo4j"
-  neo4j_password: "password"
+  neo4j_password: "password"  # Change this to your actual Neo4j password
 
 # RAG Configuration
 rag:
@@ -54,6 +54,7 @@ rag:
 apis:
   groq:
     base_url: "https://api.groq.com/openai/v1"
+    api_key: "your_groq_api_key_here"  # ADD THIS LINE with your actual key
     timeout: 30
 
   hf:
