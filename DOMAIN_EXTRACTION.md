@@ -254,7 +254,7 @@ export GROQ_API_KEY="your-api-key-here"
 
 Models used:
 
-- Classification: `llama3-8b-8192` (fast)
+- Classification: `openai/gpt-oss-120b` (fast)
 - Extraction: `llama-3.1-70b-versatile` (accurate)
 
 ## Usage Examples

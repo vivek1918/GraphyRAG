@@ -35,7 +35,7 @@ class ChatProcessor:
             )
         
         self.groq_client = Groq(api_key=groq_api_key)
-        self.llm_model = self.config.get('models.llm.groq', 'llama3-8b-8192')
+        self.llm_model = self.config.get('models.llm.groq', 'openai/gpt-oss-120b')
         
         logger.info(f"ChatProcessor initialized with model: {self.llm_model}")
     

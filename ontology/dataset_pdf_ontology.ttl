@@ -10,7 +10,7 @@ kg:LOCATED_IN a owl:ObjectProperty ;
 
 kg:Ontology_pdf a owl:Ontology ;
     rdfs:comment "Standalone ontology for pdf dataset with 3 documents" ;
-    owl:versionInfo "pdf-2025-11-21T21:41:12.750046" .
+    owl:versionInfo "pdf-2025-11-24T13:36:33.371677" .
 
 kg:Organization a owl:Class ;
     rdfs:label "Organization" .

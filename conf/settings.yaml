@@ -3,6 +3,7 @@ system:
   mode: "groq" # local, groq, hf
   data_dir: "./data"
   log_level: "INFO"
+  multimodal_processing: true
 
 # Model Configuration
 models:
@@ -19,8 +20,27 @@ models:
     hf: "microsoft/DialoGPT-medium"
 
   llm:
-    groq: "llama3-8b-8192"  # Changed to a valid Groq model
-    local: "llama-7b-q4.gguf"
+    groq: "llama-3.1-70b-versatile"  # Valid Groq model
+    local: "llama-3.1-70b-versatile"
+
+# Multi-modal Model Configuration
+multimodal:
+  audio:
+    transcription_model: "whisper-large-v3"  # For local transcription
+    groq_model: "llama-3.1-70b-versatile"   # For transcript analysis
+  image:
+    ocr_engine: "tesseract"                 # For text extraction
+    groq_model: "llama-3.1-70b-versatile"   # For image description
+  pdf:
+    extraction_library: "pdfplumber"        # Primary PDF text extraction
+    ocr_fallback: "tesseract"               # Fallback for scanned PDFs
+    groq_model: "llama-3.1-70b-versatile"   # For PDF structure analysis
+  video:
+    audio_extraction: "moviepy"             # For extracting audio from video
+    frame_analysis: "opencv"                # For video frame processing
+    groq_model: "llama-3.1-70b-versatile"   # For video content analysis
+  text:
+    groq_model: "llama-3.1-70b-versatile"   # For text analysis
 
 # Processing Configuration
 processing:
@@ -28,6 +48,20 @@ processing:
   max_text_length: 4096
   chunk_size: 512
   chunk_overlap: 50
+  
+  # Multi-modal processing limits
+  audio:
+    max_duration: 300  # seconds
+    sample_rate: 16000
+  image:
+    max_dimension: 1024
+    supported_formats: ["jpg", "jpeg", "png", "bmp", "tiff"]
+  pdf:
+    max_pages: 50
+    ocr_timeout: 60  # seconds
+  video:
+    max_duration: 600  # seconds
+    frame_extraction_interval: 5  # seconds
 
 # Extraction Configuration
 extraction:
@@ -35,6 +69,14 @@ extraction:
   max_entities_per_doc: 100
   coref_resolution: true
   entity_linking: true
+  
+  # Modality-specific confidence thresholds
+  modality_confidence:
+    text: 0.7
+    audio: 0.6
+    image: 0.65
+    pdf: 0.7
+    video: 0.6
 
 # Knowledge Graph Configuration
 kg:
@@ -54,9 +96,64 @@ rag:
 apis:
   groq:
     base_url: "https://api.groq.com/openai/v1"
-    api_key: "your_groq_api_key_here"  # ADD THIS LINE with your actual key
+    api_key: "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"  # Replace with your actual Groq API key
     timeout: 30
-
+    max_retries: 3
+    rate_limit: 100  # requests per minute
+    
   hf:
     base_url: "https://api-inference.huggingface.co"
     timeout: 30
+    api_key: "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"  # Optional: for HF inference API
+
+  # External APIs for multi-modal processing (optional)
+  google:
+    speech_to_text: false
+    api_key: ""  # If using Google Speech-to-Text
+    
+  azure:
+    computer_vision: false
+    endpoint: ""
+    api_key: ""
+
+# File Type Configuration
+file_types:
+  supported_formats:
+    text: [".txt", ".md", ".json", ".xml", ".csv", ".html"]
+    audio: [".wav", ".mp3", ".m4a", ".flac", ".aac", ".ogg"]
+    image: [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"]
+    pdf: [".pdf"]
+    video: [".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv"]
+  
+  default_modality: "text"
+
+# Path Configuration
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  models: "data/models"
+  temp: "data/temp"
+  
+  # Multi-modal specific paths
+  audio_transcripts: "data/processed/audio/transcripts"
+  image_descriptions: "data/processed/image/descriptions"
+  pdf_extracted: "data/processed/pdf/extracted"
+  video_analysis: "data/processed/video/analysis"
+
+# Performance Configuration
+performance:
+  max_workers: 4
+  cache_results: true
+  cache_ttl: 3600  # 1 hour
+  
+  # Memory limits
+  max_memory_usage: 0.8  # 80% of available memory
+  cleanup_interval: 300  # 5 minutes
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  file: "logs/processing.log"
+  max_size: "100MB"
+  backup_count: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
