@@ -57,9 +57,9 @@ class DomainExtractor:
                 api_key = os.getenv('GROQ_API_KEY')
                 if api_key:
                     self.llm_client = Groq(api_key=api_key)
-                    logger.info("Initialized Groq LLM client for domain extraction")
-                    self.llm_model = self.config.get('models', {}).get('llm', {}).get('groq', 'openai/gpt-oss-120b')
-                    logger.info(f"Initialized Groq LLM ({self.llm_model}) for domain extraction")
+                    # Use fast Llama model for better performance on long documents
+                    self.llm_model = self.config.get('models', {}).get('llm', {}).get('groq', 'llama-3.1-8b-instant')
+                    logger.info(f"✓ Groq LLM initialized ({self.llm_model}) for domain extraction")
                 else:
                     logger.warning("GROQ_API_KEY not found, domain extraction will be limited")
                     self.llm_client = None
@@ -106,10 +106,12 @@ class DomainExtractor:
         content = document.get('content', '')
         
         # Truncate if too long (leave room for response)
-        max_chars = 6000
+        # Increased limit for better coverage of long PDFs
+        max_chars = 12000
         if len(content) > max_chars:
-            content = content[:max_chars] + "\n...[truncated for API limits]..."
-            logger.info(f"Truncated content to {max_chars} chars for LLM extraction")
+            # Take first 8000 and last 4000 chars to get beginning and end
+            content = content[:8000] + "\n...[middle section truncated]...\n" + content[-4000:]
+            logger.debug(f"Truncated long document to {max_chars} chars (start + end)")
             
         # Build extraction prompt
         prompt = self._build_extraction_prompt(schema, content)
@@ -122,7 +124,7 @@ class DomainExtractor:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=3000  # Reduced to avoid truncation
+                max_tokens=2000  # Optimized for speed with llama-3.1-8b-instant
             )
             
             result_text = response.choices[0].message.content.strip()

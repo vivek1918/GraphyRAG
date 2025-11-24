@@ -39,6 +39,8 @@ faiss-cpu
 chromadb
 llama-index
 langchain
+langchain-community
+langchain-huggingface
 
 # APIs & Web
 fastapi

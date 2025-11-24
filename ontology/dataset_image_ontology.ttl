@@ -5,15 +5,12 @@
 kg:Concept a owl:Class ;
     rdfs:label "Concept" .
 
-kg:Event a owl:Class ;
-    rdfs:label "Event" .
-
 kg:LOCATED_IN a owl:ObjectProperty ;
     rdfs:label "LOCATED_IN" .
 
-kg:Ontology_pdf a owl:Ontology ;
-    rdfs:comment "Standalone ontology for pdf dataset with 9 documents" ;
-    owl:versionInfo "pdf-2025-11-24T22:20:00.562344" .
+kg:Ontology_image a owl:Ontology ;
+    rdfs:comment "Standalone ontology for image dataset with 8 documents" ;
+    owl:versionInfo "image-2025-11-24T21:11:20.179812" .
 
 kg:Organization a owl:Class ;
     rdfs:label "Organization" .

@@ -1,25 +1,19 @@
 import logging
 import sys
-from utils.config_loader import get_config
 
-def setup_logger(name: str = None) -> logging.Logger:
-    """Setup logger based on configuration"""
-    config = get_config()
-    log_level = config.get('system.log_level', 'INFO')
+def setup_logger(name: str) -> logging.Logger:
+    """Setup logger with consistent configuration"""
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
     
-    # Convert string level to logging constant
-    level = getattr(logging, log_level.upper(), logging.INFO)
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     
-    logger = logging.getLogger(name or __name__)
-    logger.setLevel(level)
-    
-    # Avoid adding handlers multiple times
-    if not logger.handlers:
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+    # Create console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
     
     return logger
