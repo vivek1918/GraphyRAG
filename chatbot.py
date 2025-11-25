@@ -79,10 +79,39 @@ class VectorStore:
                 model_name="sentence-transformers/all-MiniLM-L6-v2",
                 model_kwargs={'device': 'cpu'}
             )
-        except ImportError:
-            # Fallback to simpler approach
-            from sentence_transformers import SentenceTransformer
-            self.embeddings = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("Initialized HuggingFaceEmbeddings successfully")
+        except ImportError as e:
+            logger.warning(f"langchain_huggingface not available: {e}")
+            try:
+                # Try alternative import
+                from langchain.embeddings import HuggingFaceEmbeddings
+                self.embeddings = HuggingFaceEmbeddings(
+                    model_name="sentence-transformers/all-MiniLM-L6-v2",
+                    model_kwargs={'device': 'cpu'}
+                )
+                logger.info("Initialized HuggingFaceEmbeddings from langchain.embeddings")
+            except ImportError:
+                # Create a wrapper for SentenceTransformer to make it compatible with LangChain
+                from sentence_transformers import SentenceTransformer
+                from langchain.embeddings.base import Embeddings
+                logger.info("Using SentenceTransformer with custom wrapper")
+                
+                class SentenceTransformerWrapper(Embeddings):
+                    """Wrapper to make SentenceTransformer compatible with LangChain"""
+                    def __init__(self, model_name='all-MiniLM-L6-v2'):
+                        self.model = SentenceTransformer(model_name)
+                    
+                    def embed_documents(self, texts):
+                        """Embed a list of documents"""
+                        embeddings = self.model.encode(texts, convert_to_numpy=True)
+                        return embeddings.tolist()
+                    
+                    def embed_query(self, text):
+                        """Embed a single query"""
+                        embedding = self.model.encode([text], convert_to_numpy=True)
+                        return embedding[0].tolist()
+                
+                self.embeddings = SentenceTransformerWrapper()
     
     def create_vector_store(self, documents: List[str]):
         """Create FAISS vector store from documents"""
