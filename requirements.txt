@@ -47,6 +47,8 @@ fastapi
 uvicorn
 requests
 aiohttp
+streamlit
+plotly
 
 # Utilities
 pydantic
@@ -65,3 +67,13 @@ faker
 reportlab
 
 neo4j
+
+groq
+pytesseract
+pillow
+pypdf2
+pdfplumber
+whisper
+pydub
+moviepy
+opencv-python

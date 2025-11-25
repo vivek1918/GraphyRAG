@@ -3,6 +3,7 @@
 ## ✅ Completed Work
 
 ### 1. **Base Extractor Framework** (`extract/base_extractor.py`)
+
 - ✅ Abstract base class with 15+ utility methods
 - ✅ Standardized `extract()` method signature: returns `(content, segments, modality_data)`
 - ✅ Entity hints extraction (7 patterns: PERSON, ORG, PLACE, DATE, EMAIL, PHONE, URL)
@@ -14,6 +15,7 @@
 **Lines of Code**: 420
 
 ### 2. **Audio Extractor** (`extract/audio_extractor.py`)
+
 - ✅ 4-method transcription chain:
   1. OpenAI Whisper (local) - confidence 0.9
   2. Groq Whisper API - confidence 0.85
@@ -27,6 +29,7 @@
 **Lines of Code**: 370
 
 ### 3. **Image Extractor** (`extract/image_extractor.py`)
+
 - ✅ 3 OCR methods + Vision:
   1. Tesseract OCR (DPI 300, with preprocessing)
   2. EasyOCR (complex/multi-language)
@@ -40,6 +43,7 @@
 **Lines of Code**: 390
 
 ### 4. **Video Extractor** (`extract/video_extractor.py`)
+
 - ✅ Audio extraction using MoviePy
 - ✅ Delegates transcription to AudioExtractor (code reuse)
 - ✅ Key frame sampling: every 30s (configurable), max 10 frames
@@ -51,6 +55,7 @@
 **Lines of Code**: 350
 
 ### 5. **Text Extractor** (`extract/text_extractor.py`)
+
 - ✅ 6-encoding fallback chain: UTF-8 → Latin-1 → CP1252 → ISO-8859-1 → ASCII → Lossy UTF-8
 - ✅ Structure detection: markdown, code, log, structured, plain
 - ✅ 4 segmentation strategies:
@@ -65,6 +70,7 @@
 **Lines of Code**: 370
 
 ### 6. **Multi-Modal Processor** (`extract/multimodal_processor.py`)
+
 - ✅ Clean coordinator routing documents to extractors
 - ✅ Initialization of all 4 format extractors
 - ✅ Standardized `process_document()` method
@@ -77,6 +83,7 @@
 **Lines of Code**: 360 (down from 791)
 
 ### 7. **Documentation** (`MULTIMODAL_ARCHITECTURE.md`)
+
 - ✅ Comprehensive architecture overview with diagrams
 - ✅ Format-specific extraction chains documented
 - ✅ JSON output schema with examples
@@ -92,15 +99,15 @@
 
 ## 📊 Code Statistics
 
-| Component | Lines | Status | Quality |
-|-----------|-------|--------|---------|
-| BaseExtractor | 420 | ✅ Complete | Production-ready |
-| AudioExtractor | 370 | ✅ Complete | Production-ready |
-| ImageExtractor | 390 | ✅ Complete | Production-ready |
-| VideoExtractor | 350 | ✅ Complete | Production-ready |
-| TextExtractor | 370 | ✅ Complete | Production-ready |
-| MultiModalProcessor | 360 | ✅ Complete | Production-ready |
-| **Total New Code** | **2,260** | **100%** | **All Lint Clean** |
+| Component           | Lines     | Status      | Quality            |
+| ------------------- | --------- | ----------- | ------------------ |
+| BaseExtractor       | 420       | ✅ Complete | Production-ready   |
+| AudioExtractor      | 370       | ✅ Complete | Production-ready   |
+| ImageExtractor      | 390       | ✅ Complete | Production-ready   |
+| VideoExtractor      | 350       | ✅ Complete | Production-ready   |
+| TextExtractor       | 370       | ✅ Complete | Production-ready   |
+| MultiModalProcessor | 360       | ✅ Complete | Production-ready   |
+| **Total New Code**  | **2,260** | **100%**    | **All Lint Clean** |
 
 ## 🎯 Architecture Achievements
 
@@ -117,11 +124,13 @@
 ### ✅ Output Consistency
 
 All extractors return the same structure:
+
 ```python
 (content: str, segments: List[Dict], modality_data: Dict)
 ```
 
 Which gets wrapped into:
+
 ```python
 {
     'content': str,              # For NER
@@ -137,6 +146,7 @@ Which gets wrapped into:
 ### ✅ Quality Metrics
 
 Each extraction includes:
+
 - **Confidence**: 0.0-1.0 based on method reliability
 - **Completeness**: Ratio of extracted to optimal length
 - **Text Quality**: Unique words / total words
@@ -144,20 +154,22 @@ Each extraction includes:
 
 ### ✅ Fallback Chains
 
-| Format | Methods | Total Fallbacks |
-|--------|---------|-----------------|
-| Audio | 4 | Whisper → Groq → AssemblyAI → Google |
-| Image | 4 | Tesseract → EasyOCR → PaddleOCR + Vision |
-| Video | 2+ | Audio chain + Frame sampling |
-| Text | 6 | UTF-8 → Latin-1 → CP1252 → ISO → ASCII → Lossy |
-| PDF | 2 | pdfplumber → PyPDF2 (existing) |
+| Format | Methods | Total Fallbacks                                |
+| ------ | ------- | ---------------------------------------------- |
+| Audio  | 4       | Whisper → Groq → AssemblyAI → Google           |
+| Image  | 4       | Tesseract → EasyOCR → PaddleOCR + Vision       |
+| Video  | 2+      | Audio chain + Frame sampling                   |
+| Text   | 6       | UTF-8 → Latin-1 → CP1252 → ISO → ASCII → Lossy |
+| PDF    | 2       | pdfplumber → PyPDF2 (existing)                 |
 
 ## ⏭️ Next Steps
 
 ### 1. **Update Demo Pipeline** (HIGH PRIORITY)
+
 **File**: `scripts/demo_pipeline.py`
 
 **Changes Needed**:
+
 ```python
 # In _discover_existing_files() method:
 modality_config = {
@@ -196,18 +208,21 @@ for modality, config in modality_config.items():
 ### 2. **Install Dependencies** (HIGH PRIORITY)
 
 **Audio**:
+
 ```bash
 pip install openai-whisper pydub mutagen
 # Optional: assemblyai google-cloud-speech
 ```
 
 **Image**:
+
 ```bash
 pip install easyocr paddleocr
 brew install tesseract  # macOS
 ```
 
 **Video**:
+
 ```bash
 pip install moviepy opencv-python
 ```
@@ -217,6 +232,7 @@ pip install moviepy opencv-python
 ### 3. **End-to-End Testing** (HIGH PRIORITY)
 
 **Test Files Needed**:
+
 - [ ] `data/raw/audio/test.mp3` - Speech recording
 - [ ] `data/raw/img/test.jpg` - Image with text
 - [ ] `data/raw/video/test.mp4` - Short video clip
@@ -224,12 +240,14 @@ pip install moviepy opencv-python
 - [ ] `data/raw/pdf/test.pdf` - Already working (8 resumes)
 
 **Test Command**:
+
 ```bash
 cd "Knowledge Graph"
 python scripts/demo_pipeline.py
 ```
 
 **Expected Results**:
+
 - All files discovered and processed
 - Entities extracted from all formats
 - Relations created between entities
@@ -241,6 +259,7 @@ python scripts/demo_pipeline.py
 ### 4. **Create Sample Data** (MEDIUM PRIORITY)
 
 Create README in each directory:
+
 ```
 data/raw/
 ├── audio/README.md
@@ -250,6 +269,7 @@ data/raw/
 ```
 
 Each README should document:
+
 - Supported file formats
 - Example filenames
 - What gets extracted
@@ -260,6 +280,7 @@ Each README should document:
 ### 5. **Update Main README** (MEDIUM PRIORITY)
 
 Add section to main `README.md`:
+
 - Link to MULTIMODAL_ARCHITECTURE.md
 - Brief overview of supported formats
 - Quick start guide for multi-modal extraction
@@ -270,6 +291,7 @@ Add section to main `README.md`:
 ## 🔍 Testing Checklist
 
 ### ✅ Code Quality
+
 - [x] All extractors follow BaseExtractor pattern
 - [x] Consistent return signature: `(content, segments, modality_data)`
 - [x] No lint errors (except missing optional dependencies)
@@ -277,6 +299,7 @@ Add section to main `README.md`:
 - [x] Type hints for parameters and returns
 
 ### ⏳ Functional Testing (NOT YET DONE)
+
 - [ ] Audio: .mp3 → transcript → entities extracted
 - [ ] Image: .jpg → OCR + description → entities extracted
 - [ ] Video: .mp4 → transcript + frames → entities extracted
@@ -284,6 +307,7 @@ Add section to main `README.md`:
 - [ ] PDF: .pdf → text → entities extracted (ALREADY WORKING)
 
 ### ⏳ Integration Testing (NOT YET DONE)
+
 - [ ] MultiModalProcessor routes correctly
 - [ ] Entity hints improve NER accuracy
 - [ ] All segments have proper metadata
@@ -291,6 +315,7 @@ Add section to main `README.md`:
 - [ ] Error documents created on failure
 
 ### ⏳ Pipeline Testing (NOT YET DONE)
+
 - [ ] demo_pipeline.py discovers all format files
 - [ ] All formats process through NER
 - [ ] Relations extracted from all formats
@@ -300,12 +325,14 @@ Add section to main `README.md`:
 ## 📈 Expected Performance
 
 ### Before (PDF Only)
+
 - **Formats Supported**: 1 (PDF)
 - **Processing**: 8 resumes → 431 entities, 3,113 relations
 - **Per Document**: 56-99 entities, 210-593 relations
 - **Extraction Quality**: High (multi-method fallback)
 
 ### After (Multi-Modal)
+
 - **Formats Supported**: 5 (PDF, Audio, Image, Video, Text)
 - **Processing**: Expected similar entity/relation density per format
 - **Audio**: Speech → text → entities (similar to PDF)
@@ -327,11 +354,13 @@ Add section to main `README.md`:
 ## 🔧 Technical Debt
 
 ### Minor Issues
+
 - [ ] Missing optional dependencies (pydub, easyocr, paddleocr, moviepy)
   - **Impact**: Low - Fallback methods will be used
   - **Fix**: `pip install` commands documented in MULTIMODAL_ARCHITECTURE.md
 
 ### No Major Issues
+
 - All extractors are production-ready
 - No known bugs or architectural flaws
 - Code follows consistent patterns
@@ -342,12 +371,13 @@ Add section to main `README.md`:
 1. **PDF Extraction**: Kept existing implementation because it already works well (56-99 entities per resume)
 2. **Code Reuse**: VideoExtractor delegates audio transcription to AudioExtractor
 3. **Extensibility**: Easy to add new formats by extending BaseExtractor
-4. **Testing**: Requires sample files in data/raw/* directories to validate end-to-end
+4. **Testing**: Requires sample files in data/raw/\* directories to validate end-to-end
 5. **Dependencies**: Some optional dependencies not installed yet, but code handles gracefully
 
 ## 🚀 Ready for Testing
 
 The architecture is **fully implemented** and **production-ready**. Next step is to:
+
 1. Update demo_pipeline.py for multi-format discovery
 2. Install dependencies
 3. Add sample files

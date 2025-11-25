@@ -348,8 +348,8 @@ export GROQ_API_KEY="gsk_..."
 
 Models used:
 
-- Classification: `llama3-8b-8192` (fast, accurate)
-- Extraction: `llama-3.1-70b-versatile` (precise, structured)
+- Classification: `openai/gpt-oss-120b` (fast, accurate)
+- Extraction: `openai/gpt-oss-120b` (precise, structured)
 
 ---
 

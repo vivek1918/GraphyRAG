@@ -44,30 +44,23 @@ class MultiModalProcessor:
     Routes documents to format-specific extractors and returns standardized output.
     """
     
-    def __init__(self, groq_api_key: Optional[str] = None, enable_llm_hints: bool = False):
+    def __init__(self, groq_api_key: Optional[str] = None):
         """
         Initialize MultiModalProcessor with format-specific extractors.
         
         Args:
             groq_api_key: Groq API key for LLM-based enhancements
-            enable_llm_hints: Enable LLM-based entity hint extraction (default: False to avoid blocking)
         """
         if not groq_api_key:
             groq_api_key = os.getenv('GROQ_API_KEY')
         
-        # Configuration for extractors
-        extractor_config = {
-            'enable_llm_hints': enable_llm_hints
-        }
-        
         # Initialize format-specific extractors
-        self.audio_extractor = AudioExtractor(groq_api_key=groq_api_key, config=extractor_config)
-        self.image_extractor = ImageExtractor(groq_api_key=groq_api_key, config=extractor_config)
-        self.video_extractor = VideoExtractor(groq_api_key=groq_api_key, config=extractor_config)
-        self.text_extractor = TextExtractor(groq_api_key=groq_api_key, config=extractor_config)
-        self.enable_llm_hints = enable_llm_hints
+        self.audio_extractor = AudioExtractor(groq_api_key=groq_api_key)
+        self.image_extractor = ImageExtractor(groq_api_key=groq_api_key)
+        self.video_extractor = VideoExtractor(groq_api_key=groq_api_key)
+        self.text_extractor = TextExtractor(groq_api_key=groq_api_key)
         
-        logger.info(f"✓ MultiModalProcessor initialized (LLM hints: {'enabled' if enable_llm_hints else 'disabled'})")
+        logger.info("✓ MultiModalProcessor initialized with all format extractors")
     
     async def process_document(self, document: Dict[str, Any]) -> Dict[str, Any]:
         """

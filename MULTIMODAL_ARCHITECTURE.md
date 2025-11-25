@@ -47,12 +47,14 @@ All extractors inherit from `BaseExtractor` which provides:
 **Supported Formats**: `.mp3`, `.wav`, `.m4a`, `.flac`, `.ogg`, `.wma`, `.aac`
 
 **Extraction Chain** (4 fallback methods):
+
 1. **OpenAI Whisper (Local)** - Fast, confidence=0.9, requires `openai-whisper`
 2. **Groq Whisper API** - Cloud-based, requires GROQ_API_KEY
 3. **AssemblyAI** - Commercial, requires ASSEMBLYAI_API_KEY
 4. **Google Speech-to-Text** - Enterprise, requires `google-cloud-speech`
 
 **Output**:
+
 ```python
 {
     'content': 'Full transcript text...',
@@ -77,6 +79,7 @@ All extractors inherit from `BaseExtractor` which provides:
 ```
 
 **Quality Metrics**:
+
 - **High quality**: 100-200 WPM
 - **Medium quality**: 80-100 or 200-250 WPM
 - **Low quality**: 50-80 or 250-300 WPM
@@ -87,17 +90,20 @@ All extractors inherit from `BaseExtractor` which provides:
 **Supported Formats**: `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.tiff`, `.webp`
 
 **Extraction Chain** (3 OCR methods + Vision):
+
 1. **Tesseract OCR** - Fast, reliable, DPI=300, includes preprocessing
 2. **EasyOCR** - Better for complex/multi-language text
 3. **PaddleOCR** - High accuracy fallback
 4. **LLM Vision** - Groq vision model for image description (always attempted if enabled)
 
 **Image Preprocessing**:
+
 - Contrast enhancement (1.5x)
 - Sharpness enhancement (2.0x)
 - Median filtering for noise reduction
 
 **Output**:
+
 ```python
 {
     'content': 'Extracted Text: ...\n\nImage Description: ...',
@@ -128,6 +134,7 @@ All extractors inherit from `BaseExtractor` which provides:
 ```
 
 **Text Coverage Classification**:
+
 - **High**: >100 chars per 250k pixels
 - **Medium**: 50-100 chars per 250k pixels
 - **Low**: 10-50 chars per 250k pixels
@@ -138,6 +145,7 @@ All extractors inherit from `BaseExtractor` which provides:
 **Supported Formats**: `.mp4`, `.avi`, `.mov`, `.mkv`, `.flv`, `.wmv`, `.webm`, `.m4v`
 
 **Processing Pipeline**:
+
 1. **Extract Audio Track** - Using `moviepy`, save to temp WAV
 2. **Transcribe Audio** - Delegates to `AudioExtractor` for consistency
 3. **Sample Key Frames** - Every 30s (configurable), max 10 frames
@@ -145,6 +153,7 @@ All extractors inherit from `BaseExtractor` which provides:
 5. **Combine Content** - Merge transcript + frame timestamps
 
 **Output**:
+
 ```python
 {
     'content': 'Video Transcript: ...\n\nFrame Analysis: [00:00] Scene description...',
@@ -176,11 +185,13 @@ All extractors inherit from `BaseExtractor` which provides:
 ```
 
 **Frame Sampling**:
+
 - Default: 1 frame every 30 seconds
 - Maximum: 10 frames per video
 - Configurable via `frame_interval` parameter
 
 **Scene Detection**:
+
 - **Bright**: Average pixel brightness >200
 - **Dark**: Average pixel brightness <50
 - **Normal**: Everything else
@@ -190,6 +201,7 @@ All extractors inherit from `BaseExtractor` which provides:
 **Supported Formats**: `.txt`, `.md`, `.csv`, `.json`, `.xml`, `.html`, `.log`, `.yaml`, `.py`, `.js`, `.java`, etc.
 
 **Encoding Detection** (6 fallback encodings):
+
 1. UTF-8
 2. Latin-1 (ISO-8859-1)
 3. CP1252 (Windows-1252)
@@ -198,19 +210,21 @@ All extractors inherit from `BaseExtractor` which provides:
 6. UTF-8 with `errors='ignore'` (lossy)
 
 **Structure Detection**:
+
 - **Extension-based**: `.md`/`.rst` → markdown, `.py`/`.js` → code, `.log` → log
 - **Content-based**: Checks for headers (`#`), code patterns (`def`, `class`), log patterns (`ERROR:`)
 
 **Segmentation Strategies**:
 
-| Structure | Method | Behavior |
-|-----------|--------|----------|
-| Markdown | `_segment_markdown()` | Split by headers (`#`, `##`, `###`), preserve hierarchy |
-| Code | `_segment_code()` | Split by function/class definitions |
-| Log | `_segment_log()` | Chunk by 10-line groups |
-| Plain | `_segment_paragraphs()` | Split by double-newline |
+| Structure | Method                  | Behavior                                                |
+| --------- | ----------------------- | ------------------------------------------------------- |
+| Markdown  | `_segment_markdown()`   | Split by headers (`#`, `##`, `###`), preserve hierarchy |
+| Code      | `_segment_code()`       | Split by function/class definitions                     |
+| Log       | `_segment_log()`        | Chunk by 10-line groups                                 |
+| Plain     | `_segment_paragraphs()` | Split by double-newline                                 |
 
 **Output**:
+
 ```python
 {
     'content': 'Full text content...',
@@ -238,6 +252,7 @@ All extractors inherit from `BaseExtractor` which provides:
 **Supported Formats**: `.pdf`
 
 **Extraction Methods**:
+
 - `pdfplumber` (preferred) or `PyPDF2` (fallback)
 - Page-based segmentation
 - Document type inference (resume, research_paper, invoice, legal_document, etc.)
@@ -254,10 +269,10 @@ All extractors produce documents with this structure:
     'doc_id': 'unique_document_id',
     'file_path': '/path/to/file.ext',
     'file_type': 'audio',  # audio/image/video/text/pdf
-    
+
     # Extracted content
     'content': 'Main text for NER extraction...',
-    
+
     # Structured segments
     'content_segments': [
         {
@@ -268,12 +283,12 @@ All extractors produce documents with this structure:
             # Format-specific fields (timestamps, page numbers, etc.)
         }
     ],
-    
+
     # Format-specific metadata
     'modality_specific_data': {
         # Varies by format (duration, dimensions, encoding, etc.)
     },
-    
+
     # Pre-identified entities (helps downstream NER)
     'extracted_entities_hints': [
         {
@@ -285,7 +300,7 @@ All extractors produce documents with this structure:
             'end': 18
         }
     ],
-    
+
     # Extraction metadata
     'metadata': {
         'extraction_status': 'success',  # success/failed
@@ -295,7 +310,7 @@ All extractors produce documents with this structure:
         'processing_time': 2.5,  # seconds
         'extractor_used': 'audio_extractor'
     },
-    
+
     # Quality assessment
     'extraction_quality': {
         'success': True,
@@ -304,7 +319,7 @@ All extractors produce documents with this structure:
         'content_length': 5000,
         'num_segments': 10
     },
-    
+
     'processed_at': '2024-01-15T10:30:00'
 }
 ```
@@ -327,27 +342,32 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/credentials.json"
 ### Dependencies
 
 **Core Dependencies** (always required):
+
 ```bash
 pip install loguru Pillow pytesseract
 ```
 
 **Audio Processing**:
+
 ```bash
 pip install openai-whisper pydub mutagen
 # Optional: assemblyai google-cloud-speech
 ```
 
 **Image Processing**:
+
 ```bash
 pip install easyocr paddleocr
 ```
 
 **Video Processing**:
+
 ```bash
 pip install moviepy opencv-python
 ```
 
 **PDF Processing** (already installed):
+
 ```bash
 pip install PyPDF2 pdfplumber
 ```
@@ -419,11 +439,13 @@ Each extractor has multiple fallback methods. If all methods fail:
 ### Audio Issues
 
 **Problem**: "No module named 'whisper'"
+
 ```bash
 pip install openai-whisper
 ```
 
 **Problem**: Low quality transcription (WPM <50 or >300)
+
 - Check audio file quality
 - Try different transcription method
 - Ensure audio has clear speech
@@ -431,6 +453,7 @@ pip install openai-whisper
 ### Image Issues
 
 **Problem**: "Tesseract not found"
+
 ```bash
 # macOS
 brew install tesseract
@@ -443,17 +466,20 @@ Download from https://github.com/UB-Mannheim/tesseract/wiki
 ```
 
 **Problem**: Low text coverage
+
 - Image may have minimal text (e.g., photos)
 - Try enabling vision description: `use_llm_vision=True`
 
 ### Video Issues
 
 **Problem**: "MoviePy not installed"
+
 ```bash
 pip install moviepy
 ```
 
 **Problem**: No audio track extracted
+
 - Video may not have audio track
 - Check `has_audio` in modality_specific_data
 - Only visual frame analysis will be performed
@@ -461,6 +487,7 @@ pip install moviepy
 ### Text Issues
 
 **Problem**: Encoding errors
+
 - Text extractor tries 6 encodings automatically
 - If all fail, check file is actually text-based
 - Try opening in text editor to verify encoding
@@ -469,13 +496,13 @@ pip install moviepy
 
 ### Processing Times (approximate)
 
-| Format | File Size | Processing Time | Bottleneck |
-|--------|-----------|-----------------|------------|
-| PDF | 1 MB | 2-5s | Text extraction |
-| Audio | 5 min | 30-60s | Transcription (Whisper) |
-| Image | 1920x1080 | 1-3s | OCR |
-| Video | 10 min | 2-5 min | Frame extraction + transcription |
-| Text | 100 KB | <1s | I/O |
+| Format | File Size | Processing Time | Bottleneck                       |
+| ------ | --------- | --------------- | -------------------------------- |
+| PDF    | 1 MB      | 2-5s            | Text extraction                  |
+| Audio  | 5 min     | 30-60s          | Transcription (Whisper)          |
+| Image  | 1920x1080 | 1-3s            | OCR                              |
+| Video  | 10 min    | 2-5 min         | Frame extraction + transcription |
+| Text   | 100 KB    | <1s             | I/O                              |
 
 ### Optimization Tips
 
@@ -489,6 +516,7 @@ pip install moviepy
 ### Sample Data
 
 Place test files in:
+
 ```
 data/raw/
 ├── audio/
@@ -515,7 +543,8 @@ python scripts/demo_pipeline.py
 ```
 
 This will:
-1. Discover all files in data/raw/*
+
+1. Discover all files in data/raw/\*
 2. Process each with appropriate extractor
 3. Run NER on extracted content
 4. Extract relations between entities

@@ -4,7 +4,7 @@
 
 kg:CombinedOntology a owl:Ontology ;
     rdfs:comment "Union of 1 dataset ontologies" ;
-    owl:versionInfo "combined-2025-11-24T22:20:00.565404" .
+    owl:versionInfo "combined-2025-11-25T07:41:14.090200" .
 
 kg:Concept a owl:Class ;
     rdfs:label "Concept" .
@@ -17,7 +17,7 @@ kg:LOCATED_IN a owl:ObjectProperty ;
 
 kg:Ontology_pdf a owl:Ontology ;
     rdfs:comment "Standalone ontology for pdf dataset with 9 documents" ;
-    owl:versionInfo "pdf-2025-11-24T22:20:00.562344" .
+    owl:versionInfo "pdf-2025-11-25T07:41:14.085247" .
 
 kg:Organization a owl:Class ;
     rdfs:label "Organization" .
