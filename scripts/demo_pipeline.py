@@ -32,6 +32,29 @@ class DemoPipeline:
         # Initialize components (import here to avoid circular imports)
         self._initialize_components()
 
+    def save_extracted_content(self, doc: Dict):
+        extract_dir = self.data_dir / "extracted" / "pdf"
+        meta_dir = self.data_dir / "extracted" / "metadata"
+
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        meta_dir.mkdir(parents=True, exist_ok=True)
+
+        doc_id = doc["doc_id"]
+
+    # Save extracted text
+        with open(extract_dir / f"{doc_id}.txt", "w", encoding="utf-8") as f:
+            f.write(doc.get("content", ""))
+
+    # Save metadata
+        metadata = doc.get("metadata", {})
+        with open(meta_dir / f"{doc_id}.json", "w", encoding="utf-8") as f:
+            json.dump({
+                "doc_id": doc_id,
+                "extraction_method": metadata.get("extraction_method"),
+                "quality_score": metadata.get("quality_score"),
+                "metrics": metadata.get("metrics"),
+            }, f, indent=2)
+
     def _initialize_components(self):
         """Initialize all pipeline components."""
         try:
@@ -278,8 +301,14 @@ class DemoPipeline:
                 try:
                     parsed_doc = await parser.parse(doc)
                     parsed_doc['source_type'] = doc_type
+
+                    # ✅ SAVE extracted PDF text + metadata
+                    if doc_type == "pdf" and parsed_doc.get("content"):
+                        self.save_extracted_content(parsed_doc)
+
                     parsed_docs.append(parsed_doc)
                     logger.debug(f"Parsed {doc_type} document: {doc['doc_id']}")
+
                 except Exception as e:
                     logger.error(f"Error parsing {doc_type} document {doc['doc_id']}: {e}")
                     # Create basic parsed document
