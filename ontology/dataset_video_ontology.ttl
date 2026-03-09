@@ -1,0 +1,8 @@
+@prefix kg: <http://kg.example.org/ontology/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+kg:Ontology_video a owl:Ontology ;
+    rdfs:comment "Standalone ontology for video dataset with 2 documents" ;
+    owl:versionInfo "video-2025-11-24T21:11:20.180845" .
+

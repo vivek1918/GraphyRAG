@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Domain-specific extraction using structured prompts and LLMs.
-Extracts entities according to domain schemas.
+Multi-format domain-specific extraction using structured prompts and LLMs.
+Extracts entities from text, audio, images, PDFs, and video according to domain schemas.
 """
 
 import os
@@ -9,7 +9,7 @@ import json
 import yaml
 import asyncio
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from loguru import logger
 
 # Load environment variables from .env file
@@ -22,8 +22,35 @@ except ImportError:
 from extract.domain_schemas import DomainSchemas, DomainSchema, EntitySchema
 
 
-class DomainExtractor:
-    """Extract domain-specific structured information from documents."""
+class MultiModalExtractor:
+    """Base class for multi-modal data extraction."""
+    
+    def __init__(self):
+        self.supported_modalities = ['text', 'audio', 'image', 'pdf', 'video']
+    
+    def extract_from_text(self, content: str, domain: str, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract entities from text content."""
+        raise NotImplementedError
+        
+    def extract_from_audio(self, audio_path: str, domain: str, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract entities from audio content."""
+        raise NotImplementedError
+        
+    def extract_from_image(self, image_path: str, domain: str, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract entities from image content."""
+        raise NotImplementedError
+        
+    def extract_from_pdf(self, pdf_path: str, domain: str, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract entities from PDF content."""
+        raise NotImplementedError
+        
+    def extract_from_video(self, video_path: str, domain: str, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract entities from video content."""
+        raise NotImplementedError
+
+
+class DomainExtractor(MultiModalExtractor):
+    """Extract domain-specific structured information from multi-format documents."""
     
     def __init__(self, mode: str = "groq", config_path: Optional[Path] = None):
         """
@@ -33,9 +60,11 @@ class DomainExtractor:
             mode: Extraction mode ('groq', 'local', 'hybrid')
             config_path: Path to settings.yaml
         """
+        super().__init__()
         self.mode = mode
         self.config = self._load_config(config_path)
         self._setup_llm()
+        self._setup_modality_extractors()
         
     def _load_config(self, config_path: Optional[Path]) -> Dict[str, Any]:
         """Load configuration."""
@@ -57,9 +86,9 @@ class DomainExtractor:
                 api_key = os.getenv('GROQ_API_KEY')
                 if api_key:
                     self.llm_client = Groq(api_key=api_key)
-                    logger.info("Initialized Groq LLM client for domain extraction")
-                    self.llm_model = self.config.get('models', {}).get('llm', {}).get('groq', 'openai/gpt-oss-120b')
-                    logger.info(f"Initialized Groq LLM ({self.llm_model}) for domain extraction")
+                    # Use fast Llama model for better performance on long documents
+                    self.llm_model = self.config.get('models', {}).get('llm', {}).get('groq', 'llama-3.1-8b-instant')
+                    logger.info(f"✓ Groq LLM initialized ({self.llm_model}) for domain extraction")
                 else:
                     logger.warning("GROQ_API_KEY not found, domain extraction will be limited")
                     self.llm_client = None
@@ -69,66 +98,186 @@ class DomainExtractor:
         else:
             logger.info("LLM not configured, using rule-based extraction")
             self.llm_client = None
+
+    def _setup_modality_extractors(self):
+        """Setup modality-specific extractors."""
+        self.modality_extractors = {
+            'text': self._extract_text_entities,
+            'audio': self._extract_audio_entities,
+            'image': self._extract_image_entities,
+            'pdf': self._extract_pdf_entities,
+            'video': self._extract_video_entities
+        }
             
     async def extract(self, document: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Extract domain-specific entities from document.
+        Extract domain-specific entities from multi-format document.
         
         Args:
-            document: Document dict with 'content' and 'domain_classification'
+            document: Document dict with 'content', 'file_type', and 'domain_classification'
             
         Returns:
             Document with added 'domain_entities' field
         """
         domain_classification = document.get('domain_classification', {})
         domain = domain_classification.get('domain', 'general')
+        file_type = document.get('file_type', 'text')
         
         schema = DomainSchemas.get_schema(domain)
         
-        logger.info(f"Extracting {domain} entities from document")
+        logger.info(f"Extracting {domain} entities from {file_type} document")
         
-        if self.llm_client and domain != 'general':
-            entities = await self._extract_with_llm(document, schema)
+        # Extract entities based on modality
+        if file_type in self.modality_extractors:
+            entities = await self.modality_extractors[file_type](document, schema)
         else:
-            entities = await self._extract_rule_based(document, schema)
+            logger.warning(f"Unsupported file type: {file_type}, falling back to text extraction")
+            entities = await self._extract_text_entities(document, schema)
             
         document['domain_entities'] = {
             'domain': domain,
             'schema_version': '1.0',
-            'entities': entities
+            'file_type': file_type,
+            'entities': entities,
+            'extraction_method': 'llm' if self.llm_client else 'rule_based'
         }
         
-        logger.info(f"Extracted {len(entities)} domain-specific entities")
+        logger.info(f"Extracted {len(entities)} domain-specific entities from {file_type}")
         return document
+
+    async def _extract_text_entities(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Extract entities from text content."""
+        content = document.get('content', '')
         
-    async def _extract_with_llm(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
-        """Extract entities using LLM with structured prompts."""
+        if self.llm_client and schema.domain != 'general':
+            return await self._extract_with_llm(document, schema, 'text')
+        else:
+            return await self._extract_rule_based(document, schema, 'text')
+
+    async def _extract_audio_entities(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Extract entities from audio content."""
+        file_path = document.get('file_path', '')
+        modality_data = document.get('modality_specific_data', {})
+        transcript = modality_data.get('transcript', '')
+        
+        entities = []
+        
+        # If we have a transcript, use text extraction
+        if transcript:
+            temp_doc = document.copy()
+            temp_doc['content'] = transcript
+            entities.extend(await self._extract_text_entities(temp_doc, schema))
+        
+        # Add audio-specific entities
+        if self.llm_client:
+            audio_entities = await self._extract_audio_specific_entities(document, schema)
+            entities.extend(audio_entities)
+        else:
+            # Rule-based audio entity extraction
+            audio_entities = self._extract_audio_entities_rule_based(document, schema)
+            entities.extend(audio_entities)
+        
+        return entities
+
+    async def _extract_image_entities(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Extract entities from image content."""
+        file_path = document.get('file_path', '')
+        modality_data = document.get('modality_specific_data', {})
+        
+        entities = []
+        
+        # Use LLM for image analysis if available
+        if self.llm_client:
+            image_entities = await self._extract_image_specific_entities(document, schema)
+            entities.extend(image_entities)
+        else:
+            # Rule-based image entity extraction
+            image_entities = self._extract_image_entities_rule_based(document, schema)
+            entities.extend(image_entities)
+        
+        return entities
+
+    async def _extract_pdf_entities(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Extract entities from PDF content."""
         content = document.get('content', '')
         
         # Truncate if too long (leave room for response)
-        max_chars = 6000
+        # Increased limit for better coverage of long PDFs
+        max_chars = 12000
         if len(content) > max_chars:
-            content = content[:max_chars] + "\n...[truncated for API limits]..."
-            logger.info(f"Truncated content to {max_chars} chars for LLM extraction")
+            # Take first 8000 and last 4000 chars to get beginning and end
+            content = content[:8000] + "\n...[middle section truncated]...\n" + content[-4000:]
+            logger.debug(f"Truncated long document to {max_chars} chars (start + end)")
             
         # Build extraction prompt
         prompt = self._build_extraction_prompt(schema, content)
+        modality_data = document.get('modality_specific_data', {})
+        text_by_page = modality_data.get('text_by_page', {})
+        
+        # Combine text from all pages
+        full_text = content
+        if text_by_page and not content:
+            full_text = "\n".join(text_by_page.values())
+        
+        temp_doc = document.copy()
+        temp_doc['content'] = full_text
+        
+        return await self._extract_text_entities(temp_doc, schema)
+
+    async def _extract_video_entities(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Extract entities from video content."""
+        file_path = document.get('file_path', '')
+        modality_data = document.get('modality_specific_data', {})
+        
+        entities = []
+        
+        # Extract from audio transcript if available
+        transcript = modality_data.get('transcript', '')
+        if transcript:
+            temp_doc = document.copy()
+            temp_doc['content'] = transcript
+            entities.extend(await self._extract_text_entities(temp_doc, schema))
+        
+        # Add video-specific entities
+        if self.llm_client:
+            video_entities = await self._extract_video_specific_entities(document, schema)
+            entities.extend(video_entities)
+        else:
+            # Rule-based video entity extraction
+            video_entities = self._extract_video_entities_rule_based(document, schema)
+            entities.extend(video_entities)
+        
+        return entities
+        
+    async def _extract_with_llm(self, document: Dict[str, Any], schema: DomainSchema, modality: str) -> List[Dict[str, Any]]:
+        """Extract entities using LLM with modality-aware structured prompts."""
+        content = self._prepare_content_for_llm(document, modality)
+        
+        if not content:
+            logger.warning(f"No content available for {modality} extraction")
+            return []
+            
+        # Build modality-aware extraction prompt
+        prompt = self._build_modality_extraction_prompt(schema, content, modality)
         
         try:
             response = self.llm_client.chat.completions.create(
                 model=self.llm_model,
                 messages=[
-                    {"role": "system", "content": self._get_system_prompt(schema)},
+                    {"role": "system", "content": self._get_modality_system_prompt(schema, modality)},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=3000  # Reduced to avoid truncation
+                max_tokens=3000
             )
             
             result_text = response.choices[0].message.content.strip()
-            
-            # Parse JSON response with multiple strategies
             entities = self._parse_llm_response(result_text)
+            
+            # Add modality context to entities
+            for entity in entities:
+                entity['modality'] = modality
+                entity['source_file_type'] = document.get('file_type', 'unknown')
             
             # Validate and enrich entities
             validated_entities = []
@@ -138,77 +287,85 @@ class DomainExtractor:
                 else:
                     logger.warning(f"Invalid entity skipped: {entity.get('type', 'unknown')}")
             
-            logger.info(f"LLM extracted {len(validated_entities)} valid entities out of {len(entities)} total")
+            logger.info(f"LLM extracted {len(validated_entities)} valid entities from {modality}")
             return validated_entities
             
-        except json.JSONDecodeError as e:
-            logger.error(f"LLM returned invalid JSON: {e}")
-            logger.debug(f"Response preview: {result_text[:500] if 'result_text' in locals() else 'N/A'}...")
-            return await self._extract_rule_based(document, schema)
         except Exception as e:
-            logger.error(f"LLM extraction failed: {e}, falling back to rule-based")
-            return await self._extract_rule_based(document, schema)
-            
-    def _parse_llm_response(self, result_text: str) -> List[Dict[str, Any]]:
-        """Parse LLM response with multiple fallback strategies."""
-        # Strategy 1: Remove markdown code blocks
-        if '```json' in result_text:
-            result_text = result_text.split('```json')[1].split('```')[0].strip()
-        elif '```' in result_text:
-            result_text = result_text.split('```')[1].split('```')[0].strip()
-        
-        # Strategy 2: Try to parse as-is
-        try:
-            result = json.loads(result_text)
-            return result.get('entities', [])
-        except json.JSONDecodeError:
-            pass
-        
-        # Strategy 3: Find JSON object boundaries
-        try:
-            # Find first { and last }
-            start = result_text.find('{')
-            end = result_text.rfind('}')
-            if start != -1 and end != -1:
-                json_text = result_text[start:end+1]
-                result = json.loads(json_text)
-                return result.get('entities', [])
-        except json.JSONDecodeError:
-            pass
-        
-        # Strategy 4: Try to fix common issues
-        try:
-            # Remove trailing commas
-            fixed_text = result_text.replace(',]', ']').replace(',}', '}')
-            result = json.loads(fixed_text)
-            return result.get('entities', [])
-        except json.JSONDecodeError:
-            pass
-        
-        logger.warning("Could not parse LLM response as JSON, returning empty list")
-        return []
-            
-    def _get_system_prompt(self, schema: DomainSchema) -> str:
-        """Generate system prompt for LLM."""
-        return f"""You are an expert information extraction system specializing in {schema.domain} documents.
+            logger.error(f"LLM extraction failed for {modality}: {e}, falling back to rule-based")
+            return await self._extract_rule_based(document, schema, modality)
 
-Your task is to extract structured entities from documents according to a provided schema.
-- Extract ALL relevant entities mentioned in the document
+    def _prepare_content_for_llm(self, document: Dict[str, Any], modality: str) -> str:
+        """Prepare content for LLM based on modality."""
+        if modality == 'text':
+            content = document.get('content', '')
+            # Truncate if too long
+            max_chars = 6000
+            if len(content) > max_chars:
+                content = content[:max_chars] + "\n...[truncated for API limits]..."
+            return content
+            
+        elif modality == 'audio':
+            modality_data = document.get('modality_specific_data', {})
+            transcript = modality_data.get('transcript', '')
+            audio_metadata = {
+                'duration': modality_data.get('duration'),
+                'sample_rate': modality_data.get('sample_rate'),
+                'channels': modality_data.get('channels')
+            }
+            return f"Audio Transcript:\n{transcript}\n\nAudio Metadata: {audio_metadata}"
+            
+        elif modality == 'image':
+            modality_data = document.get('modality_specific_data', {})
+            image_metadata = {
+                'dimensions': modality_data.get('dimensions'),
+                'color_mode': modality_data.get('color_mode'),
+                'dpi': modality_data.get('dpi'),
+                'objects_detected': modality_data.get('objects_detected', [])
+            }
+            return f"Image Analysis Data:\nDetected Objects: {image_metadata['objects_detected']}\nMetadata: {image_metadata}"
+            
+        elif modality == 'video':
+            modality_data = document.get('modality_specific_data', {})
+            video_metadata = {
+                'duration': modality_data.get('duration'),
+                'resolution': modality_data.get('resolution'),
+                'fps': modality_data.get('fps'),
+                'frame_count': modality_data.get('frame_count')
+            }
+            transcript = modality_data.get('transcript', '')
+            return f"Video Analysis:\nTranscript: {transcript}\nMetadata: {video_metadata}"
+            
+        return document.get('content', '')
+
+    def _get_modality_system_prompt(self, schema: DomainSchema, modality: str) -> str:
+        """Generate modality-aware system prompt for LLM."""
+        modality_descriptions = {
+            'text': 'text documents',
+            'audio': 'audio recordings and transcripts',
+            'image': 'images and visual content',
+            'pdf': 'PDF documents',
+            'video': 'video content with audio and visual elements'
+        }
+        
+        return f"""You are an expert multi-modal information extraction system specializing in {schema.domain} {modality_descriptions.get(modality, 'documents')}.
+
+Your task is to extract structured entities from {modality} content according to a provided schema.
+- Extract ALL relevant entities mentioned in the content
 - Be thorough and accurate
-- Use exact text from document when possible
+- Use exact information from the content when possible
 - Include confidence scores (0.0-1.0)
 - Return ONLY valid JSON in the specified format
 - If a field is not present, omit it or set to null
+- Consider the unique aspects of {modality} content when extracting entities
 """
 
-    def _build_extraction_prompt(self, schema: DomainSchema, content: str) -> str:
-        """Build extraction prompt with schema definition."""
-        # Limit number of entity types to avoid overwhelming the model
-        entity_schemas = schema.entities[:5]  # Top 5 most important
+    def _build_modality_extraction_prompt(self, schema: DomainSchema, content: str, modality: str) -> str:
+        """Build modality-aware extraction prompt with schema definition."""
+        # Get relevant entity schemas for this modality
+        entity_schemas = self._get_relevant_entity_schemas(schema, modality)
         
         entity_defs = []
         for entity_schema in entity_schemas:
-            # Only include required fields to keep prompt concise
             fields_desc = []
             for field in entity_schema.fields:
                 if field.required:
@@ -229,12 +386,12 @@ Your task is to extract structured entities from documents according to a provid
             
         schema_text = "\n".join(entity_defs)
         
-        prompt = f"""Extract key entities from this {schema.domain} document. Focus on the most important information.
+        prompt = f"""Extract key entities from this {schema.domain} {modality} content. Focus on the most important information.
 
 ENTITY TYPES:
 {schema_text}
 
-DOCUMENT:
+CONTENT:
 {content}
 
 Return ONLY valid JSON (no markdown, no explanations):
@@ -244,33 +401,196 @@ Return ONLY valid JSON (no markdown, no explanations):
       "type": "<entity_type>",
       "id": "<unique_id>",
       "fields": {{"field_name": "value"}},
-      "confidence": 0.95
+      "confidence": 0.95,
+      "modality": "{modality}"
     }}
   ]
 }}
 
-Extract 3-10 most important entities."""
+Extract 3-15 most important entities relevant to {modality} content."""
         
         return prompt
+
+    def _get_relevant_entity_schemas(self, schema: DomainSchema, modality: str) -> List[EntitySchema]:
+        """Get entity schemas relevant to the specific modality."""
+        # Default: return all schemas, but can be customized per modality
+        return schema.entities[:5]  # Top 5 most important
         
-    async def _extract_rule_based(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+    async def _extract_audio_specific_entities(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Extract audio-specific entities using LLM."""
+        # This would use audio-specific analysis
+        # For now, return empty list - implement based on your audio processing capabilities
+        return []
+
+    async def _extract_image_specific_entities(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Extract image-specific entities using LLM."""
+        # This would use image analysis and object detection
+        # For now, return empty list - implement based on your image processing capabilities
+        return []
+
+    async def _extract_video_specific_entities(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Extract video-specific entities using LLM."""
+        # This would use video analysis, scene detection, etc.
+        # For now, return empty list - implement based on your video processing capabilities
+        return []
+
+    async def _extract_rule_based(self, document: Dict[str, Any], schema: DomainSchema, modality: str) -> List[Dict[str, Any]]:
         """Fallback rule-based extraction for when LLM unavailable."""
-        logger.info("Using rule-based extraction (LLM unavailable)")
+        logger.info(f"Using rule-based extraction for {modality} (LLM unavailable)")
         
+        if modality == 'text':
+            return self._extract_text_entities_rule_based(document, schema)
+        elif modality == 'audio':
+            return self._extract_audio_entities_rule_based(document, schema)
+        elif modality == 'image':
+            return self._extract_image_entities_rule_based(document, schema)
+        elif modality == 'pdf':
+            return self._extract_text_entities_rule_based(document, schema)  # PDFs are processed as text
+        elif modality == 'video':
+            return self._extract_video_entities_rule_based(document, schema)
+        else:
+            return []
+
+    def _extract_text_entities_rule_based(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Rule-based text entity extraction."""
         content = document.get('content', '')
-        entities = []
+        domain = schema.domain
         
-        # Simple pattern-based extraction
-        # This is a basic fallback - in production you'd want more sophisticated rules
+        # Generic rule-based extraction that works for any domain
+        entities = self._extract_generic_entities(content, domain)
         
-        if schema.domain == 'resume':
+        # Domain-specific rule-based extraction
+        if domain == 'resume':
             entities.extend(self._extract_resume_entities(content))
-        elif schema.domain == 'research_paper':
+        elif domain == 'research_paper':
             entities.extend(self._extract_research_entities(content))
-        # Add other domains as needed
+        # Add other domain-specific extractors as needed
         
         return entities
+
+    def _extract_generic_entities(self, content: str, domain: str) -> List[Dict[str, Any]]:
+        """Extract generic entities that apply to any domain."""
+        import re
+        entities = []
         
+        # Extract emails
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        emails = re.findall(email_pattern, content)
+        for idx, email in enumerate(emails[:3]):  # Limit to 3 emails
+            entities.append({
+                'type': 'Contact',
+                'id': f'contact_{idx}',
+                'fields': {'email': email, 'type': 'email'},
+                'confidence': 0.9,
+                'source_text': email
+            })
+        
+        # Extract URLs
+        url_pattern = r'https?://[^\s]+'
+        urls = re.findall(url_pattern, content)
+        for idx, url in enumerate(urls[:3]):
+            entities.append({
+                'type': 'WebResource',
+                'id': f'web_{idx}',
+                'fields': {'url': url},
+                'confidence': 0.9,
+                'source_text': url
+            })
+        
+        # Extract dates
+        date_pattern = r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4}\b'
+        dates = re.findall(date_pattern, content)
+        for idx, date in enumerate(dates[:5]):
+            entities.append({
+                'type': 'Date',
+                'id': f'date_{idx}',
+                'fields': {'value': date},
+                'confidence': 0.8,
+                'source_text': date
+            })
+        
+        return entities
+
+    def _extract_audio_entities_rule_based(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Rule-based audio entity extraction."""
+        modality_data = document.get('modality_specific_data', {})
+        entities = []
+        
+        # Extract audio-specific features
+        duration = modality_data.get('duration')
+        if duration:
+            entities.append({
+                'type': 'AudioFeature',
+                'id': 'audio_duration',
+                'fields': {'duration_seconds': duration, 'feature_type': 'duration'},
+                'confidence': 0.9
+            })
+        
+        sample_rate = modality_data.get('sample_rate')
+        if sample_rate:
+            entities.append({
+                'type': 'AudioFeature',
+                'id': 'audio_sample_rate',
+                'fields': {'sample_rate_hz': sample_rate, 'feature_type': 'sample_rate'},
+                'confidence': 0.9
+            })
+        
+        return entities
+
+    def _extract_image_entities_rule_based(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Rule-based image entity extraction."""
+        modality_data = document.get('modality_specific_data', {})
+        entities = []
+        
+        # Extract image-specific features
+        dimensions = modality_data.get('dimensions')
+        if dimensions:
+            entities.append({
+                'type': 'ImageFeature',
+                'id': 'image_dimensions',
+                'fields': {'width': dimensions[0], 'height': dimensions[1], 'feature_type': 'dimensions'},
+                'confidence': 0.9
+            })
+        
+        objects = modality_data.get('objects_detected', [])
+        for idx, obj in enumerate(objects[:10]):  # Limit to 10 objects
+            entities.append({
+                'type': 'VisualObject',
+                'id': f'object_{idx}',
+                'fields': {'object_name': obj, 'detection_confidence': 0.7},
+                'confidence': 0.7,
+                'source_text': obj
+            })
+        
+        return entities
+
+    def _extract_video_entities_rule_based(self, document: Dict[str, Any], schema: DomainSchema) -> List[Dict[str, Any]]:
+        """Rule-based video entity extraction."""
+        modality_data = document.get('modality_specific_data', {})
+        entities = []
+        
+        # Extract video-specific features
+        duration = modality_data.get('duration')
+        if duration:
+            entities.append({
+                'type': 'VideoFeature',
+                'id': 'video_duration',
+                'fields': {'duration_seconds': duration, 'feature_type': 'duration'},
+                'confidence': 0.9
+            })
+        
+        resolution = modality_data.get('resolution')
+        if resolution:
+            entities.append({
+                'type': 'VideoFeature',
+                'id': 'video_resolution',
+                'fields': {'resolution': resolution, 'feature_type': 'resolution'},
+                'confidence': 0.9
+            })
+        
+        return entities
+
+    # Keep the existing helper methods from your original code
     def _extract_resume_entities(self, content: str) -> List[Dict[str, Any]]:
         """Rule-based resume extraction."""
         import re
@@ -330,11 +650,46 @@ Extract 3-10 most important entities."""
                 'source_text': dois[0]
             })
             
-        # Extract author names from common patterns
-        # "Author A, Author B, and Author C"
-        # This is very simplified
-        
         return entities
+
+    def _parse_llm_response(self, result_text: str) -> List[Dict[str, Any]]:
+        """Parse LLM response with multiple fallback strategies."""
+        # Strategy 1: Remove markdown code blocks
+        if '```json' in result_text:
+            result_text = result_text.split('```json')[1].split('```')[0].strip()
+        elif '```' in result_text:
+            result_text = result_text.split('```')[1].split('```')[0].strip()
+        
+        # Strategy 2: Try to parse as-is
+        try:
+            result = json.loads(result_text)
+            return result.get('entities', [])
+        except json.JSONDecodeError:
+            pass
+        
+        # Strategy 3: Find JSON object boundaries
+        try:
+            # Find first { and last }
+            start = result_text.find('{')
+            end = result_text.rfind('}')
+            if start != -1 and end != -1:
+                json_text = result_text[start:end+1]
+                result = json.loads(json_text)
+                return result.get('entities', [])
+        except json.JSONDecodeError:
+            pass
+        
+        # Strategy 4: Try to fix common issues
+        try:
+            # Remove trailing commas
+            fixed_text = result_text.replace(',]', ']').replace(',}', '}')
+            result = json.loads(fixed_text)
+            return result.get('entities', [])
+        except json.JSONDecodeError:
+            pass
+        
+        logger.warning("Could not parse LLM response as JSON, returning empty list")
+        return []
         
     def _validate_entity(self, entity: Dict[str, Any], schema: DomainSchema) -> bool:
         """Validate extracted entity against schema."""

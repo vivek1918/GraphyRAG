@@ -34,6 +34,60 @@ class ImageParser:
         except ImportError:
             logger.warning("Tesseract not available")
     
+    async def _validate_and_repair_image(self, image_path: Path) -> Path:
+        """Validate image and try to repair if corrupted."""
+        try:
+            from PIL import Image
+            import tempfile
+            
+            # Try to open and validate the image
+            try:
+                img = Image.open(image_path)
+                img.verify()  # Verify it's not corrupted
+                
+                # Re-open after verify (verify() closes the file)
+                img = Image.open(image_path)
+                
+                # Convert to RGB if needed (handles various formats)
+                if img.mode not in ('RGB', 'L'):
+                    logger.debug(f"Converting image from {img.mode} to RGB")
+                    img = img.convert('RGB')
+                    
+                    # Save to temp file
+                    temp_file = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+                    img.save(temp_file.name, 'PNG')
+                    temp_file.close()
+                    return Path(temp_file.name)
+                
+                return image_path
+                
+            except Exception as verify_error:
+                logger.warning(f"Image verification failed: {verify_error}, attempting repair...")
+                
+                # Try to repair by re-encoding
+                try:
+                    img = Image.open(image_path)
+                    
+                    # Convert to RGB to normalize
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Save to temporary PNG (lossless, no JPEG corruption)
+                    temp_file = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+                    img.save(temp_file.name, 'PNG', optimize=False)
+                    temp_file.close()
+                    
+                    logger.info(f"✓ Repaired corrupted image: {image_path.name}")
+                    return Path(temp_file.name)
+                    
+                except Exception as repair_error:
+                    logger.error(f"Image repair failed: {repair_error}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Image validation error: {e}")
+            return None
+    
     async def parse(self, document: Dict[str, Any]) -> Dict[str, Any]:
         """Parse image file and extract text with OCR."""
         try:
@@ -43,12 +97,18 @@ class ImageParser:
                 logger.error(f"Image file not found: {file_path}")
                 return await self._create_fallback_document(document)
             
+            # Validate and repair image if needed
+            validated_path = await self._validate_and_repair_image(file_path)
+            if not validated_path:
+                logger.warning(f"Image validation failed: {file_path}, using fallback")
+                return await self._create_fallback_document(document)
+            
             # For synthetic image files with known content
             if document.get('content'):
                 return await self._create_document_from_content(document)
             
-            # Perform OCR
-            ocr_result = await self._perform_ocr(file_path)
+            # Perform OCR on validated image
+            ocr_result = await self._perform_ocr(validated_path)
             
             parsed_doc = {
                 'doc_id': document['doc_id'],
@@ -148,12 +208,24 @@ class ImageParser:
         }
     
     async def _perform_tesseract_ocr(self, image_path: Path) -> Dict[str, Any]:
-        """Perform OCR using Tesseract."""
+        """Perform OCR using Tesseract with enhanced error handling."""
         try:
             import pytesseract
             from PIL import Image
             
-            image = Image.open(image_path)
+            # Open image with PIL (more robust than letting Tesseract open it)
+            try:
+                image = Image.open(image_path)
+                
+                # Convert to RGB if needed
+                if image.mode not in ('RGB', 'L'):
+                    image = image.convert('RGB')
+                    
+            except Exception as img_error:
+                logger.error(f"Failed to open image with PIL: {img_error}")
+                raise
+            
+            # Perform OCR
             text = pytesseract.image_to_string(image)
             
             # Get detailed data

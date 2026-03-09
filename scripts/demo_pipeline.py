@@ -32,6 +32,29 @@ class DemoPipeline:
         # Initialize components (import here to avoid circular imports)
         self._initialize_components()
 
+    def save_extracted_content(self, doc: Dict):
+        extract_dir = self.data_dir / "extracted" / "pdf"
+        meta_dir = self.data_dir / "extracted" / "metadata"
+
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        meta_dir.mkdir(parents=True, exist_ok=True)
+
+        doc_id = doc["doc_id"]
+
+    # Save extracted text
+        with open(extract_dir / f"{doc_id}.txt", "w", encoding="utf-8") as f:
+            f.write(doc.get("content", ""))
+
+    # Save metadata
+        metadata = doc.get("metadata", {})
+        with open(meta_dir / f"{doc_id}.json", "w", encoding="utf-8") as f:
+            json.dump({
+                "doc_id": doc_id,
+                "extraction_method": metadata.get("extraction_method"),
+                "quality_score": metadata.get("quality_score"),
+                "metrics": metadata.get("metrics"),
+            }, f, indent=2)
+
     def _initialize_components(self):
         """Initialize all pipeline components."""
         try:
@@ -111,7 +134,8 @@ class DemoPipeline:
             pdf_docs.append({
                 "doc_id": f.stem,
                 "type": "pdf_document",
-                "file_path": str(f),        # used by PDFParser
+                "file_path": str(f),
+                "file_type": "pdf",
                 "title": f.stem,
                 "source": "existing_dataset",
                 "created_at": datetime.now().isoformat()
@@ -121,14 +145,85 @@ class DemoPipeline:
         else:
             logger.info(f"Loaded {len(pdf_docs)} existing PDF files from {pdf_dir}")
         return pdf_docs
+    
+    def _discover_existing_files(self) -> Dict[str, List[Dict]]:
+        """Discover all existing files across all modalities."""
+        logger.info("Discovering existing files across all modalities...")
+        
+        datasets: Dict[str, List[Dict]] = {}
+        
+        # Define modality configurations
+        modality_config = {
+            'pdf': {
+                'dir': self._find_pdf_dir(),
+                'extensions': ['*.pdf'],
+                'type_name': 'pdf_document'
+            },
+            'audio': {
+                'dir': self.raw_dir / "audio",
+                'extensions': ['*.mp3', '*.wav', '*.m4a', '*.flac', '*.ogg', '*.wma', '*.aac'],
+                'type_name': 'audio_document'
+            },
+            'image': {
+                'dir': self.raw_dir / "img",  # Using existing 'img' directory
+                'extensions': ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.tiff', '*.webp'],
+                'type_name': 'image_document'
+            },
+            'video': {
+                'dir': self.raw_dir / "video",
+                'extensions': ['*.mp4', '*.avi', '*.mov', '*.mkv', '*.flv', '*.wmv', '*.webm', '*.m4v'],
+                'type_name': 'video_document'
+            },
+            'text': {
+                'dir': self.raw_dir / "text",
+                'extensions': ['*.txt', '*.md', '*.csv', '*.json', '*.xml', '*.html', '*.log', '*.yaml', '*.yml'],
+                'type_name': 'text_document'
+            }
+        }
+        
+        total_files = 0
+        for modality, config in modality_config.items():
+            docs = []
+            dir_path = config['dir']
+            
+            if not dir_path.exists():
+                logger.debug(f"Directory does not exist: {dir_path}")
+                datasets[modality] = []
+                continue
+            
+            # Discover files for all extensions
+            for ext_pattern in config['extensions']:
+                for file_path in sorted(dir_path.glob(ext_pattern)):
+                    docs.append({
+                        "doc_id": file_path.stem,
+                        "type": config['type_name'],
+                        "file_path": str(file_path),
+                        "file_type": modality,
+                        "title": file_path.stem,
+                        "source": "existing_dataset",
+                        "created_at": datetime.now().isoformat()
+                    })
+            
+            datasets[modality] = docs
+            total_files += len(docs)
+            
+            if docs:
+                logger.info(f"✓ Found {len(docs)} {modality} file(s) in {dir_path}")
+            else:
+                logger.debug(f"No {modality} files found in {dir_path}")
+        
+        if total_files == 0:
+            logger.warning("No files found in any modality directories!")
+        else:
+            logger.info(f"✓ Total: {total_files} files discovered across {len([k for k,v in datasets.items() if v])} modalities")
+        
+        return datasets
 
     async def generate_data(self) -> Dict[str, List[Dict]]:
-        """Load existing PDFs (and optionally other types) or generate synthetic."""
+        """Load existing files from all modalities or generate synthetic data."""
         if self.use_existing_data:
-            logger.info("Using existing data from disk (PDFs only).")
-            datasets: Dict[str, List[Dict]] = {}
-            datasets['pdf'] = self.load_existing_pdfs()
-            # Optional: load other modalities similarly if needed
+            logger.info("Using existing data from disk (all modalities)...")
+            datasets = self._discover_existing_files()
             return datasets
         
         logger.info("Generating synthetic datasets...")
@@ -206,8 +301,14 @@ class DemoPipeline:
                 try:
                     parsed_doc = await parser.parse(doc)
                     parsed_doc['source_type'] = doc_type
+
+                    # ✅ SAVE extracted PDF text + metadata
+                    if doc_type == "pdf" and parsed_doc.get("content"):
+                        self.save_extracted_content(parsed_doc)
+
                     parsed_docs.append(parsed_doc)
                     logger.debug(f"Parsed {doc_type} document: {doc['doc_id']}")
+
                 except Exception as e:
                     logger.error(f"Error parsing {doc_type} document {doc['doc_id']}: {e}")
                     # Create basic parsed document

@@ -19,7 +19,7 @@ models:
     hf: "microsoft/DialoGPT-medium"
 
   llm:
-    groq: "openai/gpt-oss-120b"
+    groq: "llama-3.1-8b-instant" # Fast Llama model for quick extraction
     local: "llama-7b-q4.gguf"
 
 # Processing Configuration
@@ -42,20 +42,30 @@ kg:
   dataset: "kg"
   neo4j_url: "bolt://localhost:7687"
   neo4j_user: "neo4j"
-  neo4j_password: "password"
-
-# RAG Configuration
-rag:
-  vector_store: "faiss" # faiss, chroma
-  top_k: 5
-  similarity_threshold: 0.7
+  neo4j_password: "password" # Change this to your actual Neo4j password
 
 # API Configuration
 apis:
   groq:
     base_url: "https://api.groq.com/openai/v1"
+    api_key: "your_groq_api_key_here" # ADD THIS LINE with your actual key
     timeout: 30
 
   hf:
     base_url: "https://api-inference.huggingface.co"
     timeout: 30
+
+rag:
+  pdf_directory: "data/raw/pdf"
+  vector_store_path: "data/vector_store/faiss_index"
+  chunk_size: 1000
+  chunk_overlap: 200
+  similarity_top_k: 4
+
+groq:
+  model: "llama-3.3-70b-versatile"
+  temperature: 0.1
+  max_tokens: 1024
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"

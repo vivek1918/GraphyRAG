@@ -8,9 +8,9 @@ kg:Concept a owl:Class ;
 kg:LOCATED_IN a owl:ObjectProperty ;
     rdfs:label "LOCATED_IN" .
 
-kg:Ontology_pdf a owl:Ontology ;
-    rdfs:comment "Standalone ontology for pdf dataset with 8 documents" ;
-    owl:versionInfo "pdf-2026-02-02T15:08:11.965357" .
+kg:Ontology_audio a owl:Ontology ;
+    rdfs:comment "Standalone ontology for audio dataset with 5 documents" ;
+    owl:versionInfo "audio-2025-11-24T21:11:20.178900" .
 
 kg:Organization a owl:Class ;
     rdfs:label "Organization" .
@@ -23,7 +23,4 @@ kg:Place a owl:Class ;
 
 kg:RELATED_TO a owl:ObjectProperty ;
     rdfs:label "RELATED_TO" .
-
-kg:WORKS_FOR a owl:ObjectProperty ;
-    rdfs:label "WORKS_FOR" .
 

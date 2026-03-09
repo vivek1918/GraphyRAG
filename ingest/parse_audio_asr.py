@@ -17,10 +17,20 @@ class AudioParser:
         self.model_loaded = False
     
     async def load_model(self):
-        """Load Whisper model."""
+        """Load Whisper model (runs in thread pool to avoid blocking)."""
         try:
             import whisper
-            self.model = whisper.load_model("base")
+            import asyncio
+            from concurrent.futures import ThreadPoolExecutor
+            
+            def _load_sync():
+                return whisper.load_model("base")
+            
+            # Load model in thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                self.model = await loop.run_in_executor(pool, _load_sync)
+            
             self.model_loaded = True
             logger.info("Loaded Whisper model for ASR")
         except ImportError:
@@ -45,8 +55,17 @@ class AudioParser:
                 return await self._create_fallback_document(document)
             
             if self.model:
-                # Transcribe with Whisper
-                result = self.model.transcribe(str(file_path))
+                # Transcribe with Whisper (in thread pool to avoid blocking)
+                import asyncio
+                from concurrent.futures import ThreadPoolExecutor
+                
+                def _transcribe_sync():
+                    return self.model.transcribe(str(file_path), fp16=False)
+                
+                loop = asyncio.get_event_loop()
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    result = await loop.run_in_executor(pool, _transcribe_sync)
+                
                 transcript = result["text"]
                 segments = result.get("segments", [])
             else:
